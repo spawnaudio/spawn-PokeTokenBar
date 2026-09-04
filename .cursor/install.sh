@@ -52,9 +52,11 @@ fi
 if swift --version 2>/dev/null | grep -q "swift-${SWIFT_VERSION}"; then
   log "Swift ${SWIFT_VERSION} already installed"
 else
+  # `swiftly install` sets this toolchain as the global default. Avoid
+  # `swiftly use`, which would write a `.swift-version` file into the repo
+  # working tree and add noise to `git status`.
   log "Installing Swift ${SWIFT_VERSION}"
   swiftly install "$SWIFT_VERSION" --assume-yes
-  swiftly use "$SWIFT_VERSION"
 fi
 
 log "Swift toolchain ready:"
