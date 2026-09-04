@@ -12,8 +12,7 @@ actor SpriteStore {
     // 동기 재읽기 24회). 정적 PNG 는 종당 0.5~1KB 라 64 로 올려도 메모리 비용이 무의미하다.
     private let memLimit = 64
     private let dir: URL = {
-        let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PokeTokenBar/sprites")
+        let d = AppStatePaths.directory().appendingPathComponent("sprites")
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }()
@@ -93,8 +92,7 @@ actor SpriteStore {
 @MainActor
 enum SpriteLoader {
     static let cacheDir: URL = {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PokeTokenBar/sprites")
+        AppStatePaths.directory().appendingPathComponent("sprites")
     }()
 
     /// 디스크 캐시에 이미 있으면 동기 반환(네트워크 없음). 없으면 nil.
