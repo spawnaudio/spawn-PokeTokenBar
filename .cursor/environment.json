@@ -1,5 +1,4 @@
 {
-  "name": "PokeTokenBar (Linux Swift toolchain)",
-  "user": "ubuntu",
+  "name": "PokeTokenBar (Swift 6)",
   "install": "bash .cursor/install.sh"
 }
