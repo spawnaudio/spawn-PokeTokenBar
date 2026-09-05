@@ -47,7 +47,7 @@ final class ShinyCharmTests: XCTestCase {
     }
 
     func testConstantsAndPassiveFlag() {
-        XCTAssertEqual(ShinyCharm.price, 150_000_000)
+        XCTAssertEqual(ShinyCharm.price, EconomyScale.tokens(3_000_000_000))
         XCTAssertEqual(ShinyCharm.shinyDenominator, 48)
         XCTAssertTrue(ItemKind.shinyCharm.isPassive)
         XCTAssertFalse(ItemKind.rareCandy.isPassive)

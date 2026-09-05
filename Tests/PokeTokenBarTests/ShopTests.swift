@@ -160,12 +160,12 @@ final class ShopTests: XCTestCase {
         let s = CompanionStore(provider: ShopNoProvider(), clock: { self.now }, fileURL: url, rng: SeededRNG(seed: 1))
         XCTAssertTrue(s.hasActive)
         XCTAssertEqual(s.shopEntries,
-                       [.item(.mint),        // 5M
-                        .item(.rareCandy),   // 25M
-                        .egg(nil),           // 50M
-                        .egg(.uncommon),     // 125M
-                        .item(.shinyCharm),  // 150M
-                        .egg(.rare)])        // 200M
+                       [.item(.mint),
+                        .item(.rareCandy),
+                        .egg(nil),
+                        .egg(.uncommon),
+                        .item(.shinyCharm),
+                        .egg(.rare)])
         let prices = s.shopEntries.map(\.price)
         XCTAssertEqual(prices, prices.sorted(), "가격 상수가 바뀌어도 오름차순 불변식 유지")
     }

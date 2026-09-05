@@ -27,7 +27,7 @@ final class FreshEggTests: XCTestCase {
         return CompanionStore(provider: FreshEggNoProvider(), clock: { self.now }, fileURL: url, rng: SeededRNG(seed: 7))
     }
 
-    func testPriceIsFiftyMillion() { XCTAssertEqual(FreshEgg.price, 50_000_000) }
+    func testPriceMatchesScaledOfficialEgg() { XCTAssertEqual(FreshEgg.price, EconomyScale.tokens(1_000_000_000)) }
 
     /// [핵심] 리롤 = 놓아줌: active 사라지고 새 알(eggUsage 0).
     /// 도감에는 **놓아줌 기록으로 남고**, 확률 가중(collectedFinals)은 여전히 불변이다 —

@@ -30,7 +30,7 @@ final class PokemonBalanceTests: XCTestCase {
         XCTAssertLessThan(PokemonBalance.graduationTotal(.rare), PokemonBalance.graduationTotal(.legendary))
     }
     func testEconomyScaleAppliesToOfficialTokenCosts() {
-        XCTAssertEqual(EconomyScale.factor, 0.05)
+        XCTAssertEqual(EconomyScale.factor, 0.025)
         XCTAssertEqual(PokemonBalance.eggHatchThreshold, EconomyScale.tokens(5_000_000))
         XCTAssertEqual(RareCandy.price, EconomyScale.tokens(500_000_000))
         XCTAssertEqual(FreshEgg.price, EconomyScale.tokens(1_000_000_000))
