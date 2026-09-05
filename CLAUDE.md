@@ -14,6 +14,25 @@
 
 각 문서의 frontmatter(`summary`/`read_when`)가 그 문서의 적용 범위를 다시 명시한다.
 
+## Cursor Cloud specific instructions
+
+이 앱은 **macOS 전용**이다 — 소스가 AppKit·SwiftUI·Security·ServiceManagement·QuartzCore·
+ImageIO·CryptoKit 등 **Apple 전용 프레임워크**를 import 한다. 이 프레임워크들은 리눅스용
+오픈소스 Swift 툴체인에 없다.
+
+- **Cloud Agent 는 기본이 리눅스 VM 이다 → 앱을 빌드·테스트·실행할 수 없다.** 리눅스에서
+  `swift build` 는 첫 Apple 프레임워크(예: `no such module 'Security'`)에서 실패한다. 이건
+  환경 결함이 아니라 플랫폼 제약이다. 리눅스에서는 **편집·탐색과 Foundation 수준 코드**까지만 된다.
+- **전체 빌드·테스트·실행은 macOS + Xcode/Swift 6 필요** (CI 는 `macos-15`, `.github/workflows/ci.yml`).
+  리눅스 Cloud Agent 에서 `swift build`/`swift test`/`test-gate.sh` 를 돌리려 하지 말 것 — 실패가 정상.
+- **macOS Cloud Agent 가 필요하면**: Cloud Agent UI 에서 macOS 환경(Namespace Devbox, Apple
+  silicon)을 선택하거나, 자체 호스팅 Mac worker (`cursor worker start`)를 연결한다. macOS 환경은
+  `.cursor/environment.json` 로 정의할 수 없다 — 스키마가 리눅스/컨테이너(build·image·snapshot)
+  전용이라 OS 필드가 없다.
+- `.cursor/install.sh` 는 OS 를 자동 감지한다: **리눅스 → Swift 6 툴체인 설치**(앱 빌드는 안 함),
+  **macOS → 툴체인 확인 + `swift build`**. `.cursor/environment.json` 은 두 경우 모두 이 스크립트를
+  `install` 로 쓴다.
+
 ## 기여 언어 규약 (오픈소스 대비 — English first)
 
 외부 컨트리뷰션을 받을 수 있도록 이 저장소는 **영어를 first language** 로 한다.
