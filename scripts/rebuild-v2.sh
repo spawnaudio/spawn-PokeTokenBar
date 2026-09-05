@@ -1,5 +1,5 @@
 #!/bin/bash
-# Rebuild the side-by-side "PokeTokenBar v2.0" app (2.5% economy, isolated save).
+# Rebuild the side-by-side "PokeTokenBar v2.0" app (1% economy, isolated save).
 # Does not replace /Applications/PokeTokenBar.app.
 #
 #   ./scripts/rebuild-v2.sh                 # build current tree → v2.0

@@ -88,7 +88,7 @@ final class ShopTests: XCTestCase {
 
     /// 여러 번 구매하면 잔액이 바닥날 때까지만 성공(가드가 매번 재평가).
     func testMultipleBuysUntilBroke() {
-        let leftover = 10_000_000
+        let leftover = RareCandy.price / 2
         let s = store(used: 2 * RareCandy.price + leftover)
         XCTAssertTrue(s.buyRareCandy())
         XCTAssertTrue(s.buyRareCandy())

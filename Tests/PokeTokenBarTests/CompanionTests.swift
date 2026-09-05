@@ -30,7 +30,7 @@ final class PokemonBalanceTests: XCTestCase {
         XCTAssertLessThan(PokemonBalance.graduationTotal(.rare), PokemonBalance.graduationTotal(.legendary))
     }
     func testEconomyScaleAppliesToOfficialTokenCosts() {
-        XCTAssertEqual(EconomyScale.factor, 0.025)
+        XCTAssertEqual(EconomyScale.factor, 0.01)
         XCTAssertEqual(PokemonBalance.eggHatchThreshold, EconomyScale.tokens(5_000_000))
         XCTAssertEqual(RareCandy.price, EconomyScale.tokens(500_000_000))
         XCTAssertEqual(FreshEgg.price, EconomyScale.tokens(1_000_000_000))
@@ -863,8 +863,9 @@ final class CompanionStoreTests: XCTestCase {
     func testEggDoesNotHatchBelowThreshold() async {
         let s = store(linear3)
         base(s)
-        use(s, 100_000)   // < 부화 임계
-        XCTAssertEqual(s.state.eggUsage, 100_000)
+        let below = max(1, PokemonBalance.eggHatchThreshold / 2)
+        use(s, below)
+        XCTAssertEqual(s.state.eggUsage, below)
         XCTAssertTrue(s.isEgg)
         await s.hatchIfNeeded()
         XCTAssertNil(s.state.active)   // 임계 미만 → 미부화
@@ -1604,7 +1605,7 @@ final class CompanionIdentityTests: XCTestCase {
         // 알 임계 + stage0 임계 초과 → 부화 즉시 1회 진화하는 이월
         let overflow = PokemonBalance.eggHatchThreshold
             + PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
-            + 5_000_000
+            + PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 1) / 2
         s.update(todayTokensByProvider: ["test": overflow], todayDate: "d1", monthTotal: 0, burnTier: .idle, limitWarning: false, hasUsageData: true)
         await s.hatchIfNeeded()
         XCTAssertEqual(s.state.active?.isShiny, true)
