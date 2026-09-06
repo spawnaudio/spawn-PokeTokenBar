@@ -1109,7 +1109,7 @@ final class CompanionStore {
         notifyCompanionEvent(shiny ? l.notifShinyDittoRevealTitle : l.notifDittoRevealTitle,
                              shiny ? l.notifShinyDittoRevealBody(disguiseName) : l.notifDittoRevealBody(disguiseName))
         save()
-        applyUsage(0)   // 이월분으로 메타몽 졸업 재평가(rare 3B라 보통 즉시 졸업 아님)
+        applyUsage(0)   // 이월분으로 메타몽 졸업 재평가(rare 150M이라 보통 즉시 졸업 아님)
     }
 
     private func loadCurrentLine() async {

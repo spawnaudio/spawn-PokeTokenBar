@@ -1,10 +1,14 @@
 #!/bin/bash
 # PokeTokenBar.app 번들 조립 + /Applications 설치
+# Side-by-side test: PTB_APP_NAME="PokeTokenBar v2.0" PTB_BUNDLE_ID="io.github.chattymin.poketokenbar.v2" ./scripts/build-app.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="2.5.3"
-APP_NAME="PokeTokenBar"
+PRODUCT_BIN="PokeTokenBar"
+APP_NAME="${PTB_APP_NAME:-PokeTokenBar}"
+BUNDLE_ID="${PTB_BUNDLE_ID:-io.github.chattymin.poketokenbar}"
+AGENT_LABEL="${BUNDLE_ID}.login"
 BUILD_DIR="build"
 APP="$BUILD_DIR/$APP_NAME.app"
 
@@ -14,7 +18,7 @@ swift build -c release
 echo "==> $APP 조립"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp ".build/release/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
+cp ".build/release/$PRODUCT_BIN" "$APP/Contents/MacOS/$APP_NAME"
 # 심볼 strip — 릴리스 바이너리 1.84MB → 0.80MB(-57%). codesign 전에 수행(서명 무효화 방지).
 strip -rSTx "$APP/Contents/MacOS/$APP_NAME" 2>/dev/null || strip -rSx "$APP/Contents/MacOS/$APP_NAME"
 cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
@@ -24,8 +28,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleIdentifier</key><string>io.github.chattymin.poketokenbar</string>
+    <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
     <key>CFBundleName</key><string>$APP_NAME</string>
+    <key>CFBundleDisplayName</key><string>$APP_NAME</string>
     <key>CFBundleExecutable</key><string>$APP_NAME</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
@@ -42,12 +47,12 @@ PLIST
 # 워치독으로 동작. 정상 종료(exit 0: 사용자 종료·업데이트)엔 재실행 안 함(SuccessfulExit=false).
 # ProgramArguments 는 brew 설치 경로(/Applications) 고정. codesign 전에 생성해 서명 seal 에 포함.
 mkdir -p "$APP/Contents/Library/LaunchAgents"
-cat > "$APP/Contents/Library/LaunchAgents/io.github.chattymin.poketokenbar.login.plist" <<AGENT
+cat > "$APP/Contents/Library/LaunchAgents/${AGENT_LABEL}.plist" <<AGENT
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key><string>io.github.chattymin.poketokenbar.login</string>
+    <key>Label</key><string>$AGENT_LABEL</string>
     <key>ProgramArguments</key>
     <array>
         <string>/Applications/$APP_NAME.app/Contents/MacOS/$APP_NAME</string>
@@ -84,8 +89,9 @@ else
 fi
 
 echo "==> 기존 인스턴스 종료 + /Applications 설치"
+# Never pkill the stock binary when installing a side-by-side named copy.
 pkill -x "$APP_NAME" 2>/dev/null || true
 rm -rf "/Applications/$APP_NAME.app"
-cp -R "$APP" /Applications/
+cp -R "$APP" "/Applications/$APP_NAME.app"
 
 echo "완료: open /Applications/$APP_NAME.app"

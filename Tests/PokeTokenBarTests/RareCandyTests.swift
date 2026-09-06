@@ -11,8 +11,8 @@ private func rcLine(base: Int, tree: EvoNode, rarity: Rarity = .common) -> EvoLi
     for id in ids(tree) { names[id] = ["en": "P\(id)", "ko": "포\(id)", "ja": "ポ\(id)"] }
     return EvoLine(baseID: base, tree: tree, rarity: rarity, names: names)
 }
-private let rcLinear3 = rcLine(base: 1, tree: rcNode(1, [rcNode(2, [rcNode(3)])]))   // 커먼 3형태: 125M/250M/375M
-private let rcNoEvo = rcLine(base: 20, tree: rcNode(20))                              // 커먼 1형태: 750M 단일
+private let rcLinear3 = rcLine(base: 1, tree: rcNode(1, [rcNode(2, [rcNode(3)])]))   // 커먼 3형태
+private let rcNoEvo = rcLine(base: 20, tree: rcNode(20))                              // 커먼 1형태
 private let rcNow = Date(timeIntervalSince1970: 1_700_000_000)
 
 private func w(_ key: String, _ kind: WindowClass, _ util: Double, name: String = "T") -> CandyWindow {
@@ -219,7 +219,7 @@ final class RareCandyStoreTests: XCTestCase {
 
     // MARK: 사용
 
-    /// 사탕 XP(2.5M) < 최소 임계(125M) → 진화 못 시키는 케이스는 부분 진행(.progressed), 통계 불변.
+    /// 사탕 XP < 최소 진화 임계 → 진화 못 시키는 케이스는 부분 진행(.progressed), 통계 불변.
     func testUseProgressesWithoutEvolution() async {
         let s = store(rcLinear3)
         await s.hatch(baseID: 1)
@@ -238,8 +238,8 @@ final class RareCandyStoreTests: XCTestCase {
     func testUseEvolvesWhenCrossingThreshold() async {
         let s = store(rcLinear3)
         await s.hatch(baseID: 1)
-        // stage0(125M) 잔여가 사탕 XP(2.5M) 이하가 되도록 직전까지 채운다.
-        s.applyUsage(125_000_000 - RareCandy.xp)
+        let firstEvo = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
+        s.applyUsage(max(0, firstEvo - RareCandy.xp / 2))
         giveCandies(s, 1)
         let result = s.useRareCandy()
         XCTAssertEqual(result, .evolved)
@@ -251,9 +251,10 @@ final class RareCandyStoreTests: XCTestCase {
     func testSingleCandyAdvancesAtMostOneStage() async {
         let s = store(rcLinear3)
         await s.hatch(baseID: 1)
-        s.applyUsage(124_000_000)   // stage0 임계 직전
+        let firstEvo = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
+        s.applyUsage(firstEvo - 1)   // stage0 임계 직전
         giveCandies(s, 1)
-        _ = s.useRareCandy()        // +2.5M → 126.5M: stage0(125M) 1회만, stage1(250M) 미달
+        _ = s.useRareCandy()
         XCTAssertEqual(s.state.active?.stageIndex, 1, "최대 1단계")
     }
 
@@ -261,8 +262,7 @@ final class RareCandyStoreTests: XCTestCase {
     func testUseGraduatesFinalStage() async {
         let s = store(rcNoEvo)
         await s.hatch(baseID: 20)
-        // 졸업 총량 750M 잔여 ≤ 사탕 XP 가 되도록 직전까지 채운다.
-        s.applyUsage(750_000_000 - RareCandy.xp)
+        s.applyUsage(PokemonBalance.graduationTotal(.common) - RareCandy.xp / 2)
         giveCandies(s, 1)
         let result = s.useRareCandy()
         XCTAssertEqual(result, .graduated)
@@ -277,8 +277,7 @@ final class RareCandyStoreTests: XCTestCase {
     func testCandyGraduationFiresSpriteIdentityObservation() async {
         let s = store(rcNoEvo)
         await s.hatch(baseID: 20)
-        // 졸업 총량 750M 잔여 ≤ 사탕 XP 가 되도록 직전까지 채운다.
-        s.applyUsage(750_000_000 - RareCandy.xp)
+        s.applyUsage(PokemonBalance.graduationTotal(.common) - RareCandy.xp / 2)
         giveCandies(s, 1)
         let fired = expectation(description: "sprite identity observation fired")
         withObservationTracking {
@@ -345,20 +344,22 @@ final class RareCandyStoreTests: XCTestCase {
         XCTAssertEqual(s.ownedItems.first?.count, 3)
     }
 
-    /// 연속 사용: 임계 직전 → 진화 → 부분성장 → 임계 직전 → 진화, 그 뒤 재고 0.
-    /// (구 데모는 사탕 100M 전제였음 — 2.5M 에 맞게 임계 직전 셋업으로 같은 결과 시퀀스를 검증.)
+    /// 데모 시나리오(구구 3형태, usedAtStage 100M, 사탕 3): 진화 → 부분성장 → 진화, 그 뒤 재고 0.
     func testSequentialCandyUseMatchesDemo() async {
         let s = store(rcLinear3)
         await s.hatch(baseID: 1)
-        s.applyUsage(125_000_000 - RareCandy.xp)       // stage0 임계 직전
+        // Snack-sized candy XP (scaled 2.5M upstream) needs threshold-relative setup —
+        // applyUsage(RareCandy.xp) alone no longer reaches stage0 under EconomyScale.
+        let stage0 = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
+        let stage1 = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 1)
+        s.applyUsage(stage0 - RareCandy.xp)             // stage0 임계 직전
         giveCandies(s, 3)
         XCTAssertEqual(s.useRareCandy(), .evolved)     // 임계 돌파 → stage1
         XCTAssertEqual(s.state.active?.stageIndex, 1)
-        XCTAssertEqual(s.useRareCandy(), .progressed)  // 2.5M << stage1(250M) → 부분성장
+        XCTAssertEqual(s.useRareCandy(), .progressed)  // snack << stage1 → 부분성장
         XCTAssertEqual(s.state.active?.stageIndex, 1)
-        // stage1 임계(250M) 직전까지 채운 뒤 세 번째 사탕으로 진화.
         let used = s.state.active!.usedAtStage
-        s.applyUsage(250_000_000 - used - RareCandy.xp)
+        s.applyUsage(stage1 - used - RareCandy.xp)     // stage1 임계 직전
         XCTAssertEqual(s.useRareCandy(), .evolved)     // 임계 돌파 → stage2
         XCTAssertEqual(s.state.active?.stageIndex, 2)
         XCTAssertEqual(s.rareCandyCount, 0)

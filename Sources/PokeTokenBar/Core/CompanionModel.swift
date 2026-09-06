@@ -105,19 +105,19 @@ enum Rarity: String, Codable, Sendable {
     }
 }
 
-/// 토큰 경제 — 실측 평균(~253M/일) 기준.
+/// 토큰 경제 — 실측 평균(~253M/일) 기준. 금액은 `EconomyScale.tokens` 로 스케일된다.
 /// 졸업 총량 T 는 같은 희귀도면 진화 단계 수와 무관하게 동일.
 /// 형태 k개 라인에서 i번째 형태 성장 비용 = T·i / (k(k+1)/2) → 합 = T, 단계↑일수록 비용↑.
 enum PokemonBalance {
     /// 알 부화 임계 — 이만큼 토큰을 써야 알이 깨진다(즉시 부화 대신 기대감). 초과분은 부화체 성장에 이월.
-    static let eggHatchThreshold = 5_000_000
+    static let eggHatchThreshold = EconomyScale.tokens(5_000_000)
 
     static func graduationTotal(_ rarity: Rarity) -> Int {
         switch rarity {
-        case .common:    return    750_000_000
-        case .uncommon:  return  1_875_000_000
-        case .rare:      return  3_000_000_000
-        case .legendary: return  6_000_000_000
+        case .common:    return EconomyScale.tokens(750_000_000)
+        case .uncommon:  return EconomyScale.tokens(1_875_000_000)
+        case .rare:      return EconomyScale.tokens(3_000_000_000)
+        case .legendary: return EconomyScale.tokens(6_000_000_000)
         }
     }
     /// stageIndex(0-based)에서 다음 단계/졸업까지 필요한 토큰.
@@ -171,32 +171,33 @@ enum ItemKind: String, Codable, Sendable, CaseIterable {
 
 /// 이상한 사탕 밸런스 상수.
 enum RareCandy {
-    /// 사용 시 현재 포켓몬에 주입하는 XP(토큰 환산). 2.5M 은 커먼 1형태 임계(125M)보다 훨씬 작아
-    /// 사탕 1개는 최대 1단계만 올린다(연쇄·졸업 폭주 없음) — 임계 직전에서만 진화를 넘긴다.
-    /// applyUsage 로 주입 → 이월/진화/졸업 자동. (구버전 100M 은 "거의 1단계"에 가까워 상시 진화 압력
-    /// 이 커서 2.5M 스낵으로 낮춤 — Linear 완료 보상·타임오픈 XP 와 같은 체급.)
-    static let xp = 2_500_000
+    /// 사용 시 현재 포켓몬에 주입하는 XP(토큰 환산). Upstream 2.5M → 스케일 후 스낵 크기.
+    /// 최소 진화 임계(커먼 3형태 1단계)보다 작아 사탕 1개는 최대 1단계만 올린다(연쇄·졸업 폭주 없음)
+    /// — 임계 직전에서만 진화를 넘긴다. applyUsage 로 주입 → 이월/진화/졸업 자동.
+    /// (구버전 upstream 100M 은 "거의 1단계"에 가까워 상시 진화 압력이 커서 2.5M 스낵으로 낮춤 —
+    /// Linear 완료 보상·타임오픈 XP 와 같은 체급.)
+    static let xp = EconomyScale.tokens(2_500_000)
     /// 주간 한도 100% 도달 시 지급 개수(세션급은 1개).
     static let weeklyGrant = 5
     /// 상점 구매가(재화 = 사용한 토큰: usedSinceInstall − spentTokens).
     /// 토큰이 "성장 미터 + 상점 지갑"으로 이중 사용되는 구조라, 가격을 XP 와 같게 두면 구매가 사실상
-    /// 공짜 추가성장이 된다. 500M 로 두면 그 값 모으는 500M 패시브 성장 + 사탕 2.5M ≈ 실질
-    /// 보너스 +0.5% — 상점 사탕은 편의 소비, 무료 획득(한도 100% 보상)이 항상 이득.
-    static let price = 500_000_000
+    /// 공짜 추가성장이 된다. Upstream 500M(스케일 후 XP 대비 훨씬 큼) — 상점 사탕은 편의 소비,
+    /// 무료 획득(한도 100% 보상)이 항상 이득.
+    static let price = EconomyScale.tokens(500_000_000)
 }
 
 /// 민트 밸런스 상수.
 enum Mint {
     /// 상점 구매가. 성격 변경은 순수 코스메틱(성장·능력치 무관)이라 밸런스 근거가 없어 "느낌" 값 —
-    /// 사탕(500M)의 1/5로 싸게 둬서 성격을 마음에 들 때까지 굴려보는 가벼운 재미. 성장을 안 줘서
+    /// 사탕의 1/5로 싸게 둬서 성격을 마음에 들 때까지 굴려보는 가벼운 재미. 성장을 안 줘서
     /// 이중계산 이슈도 없음(가격 = 순수 소비).
-    static let price = 100_000_000
+    static let price = EconomyScale.tokens(100_000_000)
 }
 
 /// 이로치 부적 밸런스 상수 — 보유형(1회 구매·영구, 소비 안 됨).
 enum ShinyCharm {
-    /// 상점 구매가. 앞으로의 모든 부화에 적용되는 영구 럭 업그레이드라 프리미엄(레어 1마리 졸업분=3B).
-    static let price = 3_000_000_000
+    /// 상점 구매가. 앞으로의 모든 부화에 적용되는 영구 럭 업그레이드라 프리미엄(레어 1마리 졸업분).
+    static let price = EconomyScale.tokens(3_000_000_000)
     /// 보유 시 이로치 부화 확률 분모 — 1/64 → 1/48 (+33%). 본가 '반짝이 부적'(이로치 확률↑) 오마주.
     /// ×2(1/32)는 과해 절제. 이미 부화한 개체엔 소급 없음(이로치는 부화 순간 확정).
     static let shinyDenominator: UInt64 = 48
@@ -206,8 +207,8 @@ enum ShinyCharm {
 enum FreshEgg {
     /// 상점 구매가. 마음에 안 드는 부화를 리롤하는 프리미엄(쌓인 토큰의 활용처). 폐기 개체는 졸업이
     /// 아니라 그냥 사라지므로 도감·확률(collectedFinals)에 무영향 — "뽑은 적 없던 것처럼". 새 알은
-    /// 처음부터 재인큐베이션(5M) 필요 + 성장(usedAtStage) 소멸이라 스팸/파밍이 자연 억제된다.
-    static let price = 1_000_000_000
+    /// 처음부터 재인큐베이션 필요 + 성장(usedAtStage) 소멸이라 스팸/파밍이 자연 억제된다.
+    static let price = EconomyScale.tokens(1_000_000_000)
 
     /// 상점에서 파는 알 — 보증 없음(기본) → 고급 이상 → 희귀 이상. `nil` = 등급 보증 없는 기존 알.
     /// **전설 전용 알은 팔지 않는다**(등급 하한을 capture_rate 로 표현할 수 없고, 최고 등급을 확정
@@ -215,12 +216,12 @@ enum FreshEgg {
     static let shopTiers: [Rarity?] = [nil, .uncommon, .rare]
 
     /// 등급 보증 알의 가격 — 배율은 새 상수를 짓지 않고 **기존 졸업 총량 표**를 그대로 쓴다
-    /// (common 750M : uncommon 1.875B : rare 3B = 1 : 2.5 : 4 → 1B / 2.5B / 4B).
+    /// (common : uncommon : rare 졸업량 = 1 : 2.5 : 4).
     ///
     /// 확률 배율(고급 7.16% : 희귀 6.98% ≈ 1 : 2.03)로 매기면 안 된다 — 그러면 같은 값으로 고급 알
     /// 2개를 사는 쪽이 희귀+ 기대 1.039마리·전설 0.104마리로 희귀 알 1개(1.000·0.100)를 모든 축에서
-    /// 앞질러 상위 티어가 완전 열등재가 된다. 졸업량 배율이라야 상위 티어가 희귀+ 1마리당 4.00B 로
-    /// 하위 반복 구매(4.81B)보다 싸다.
+    /// 앞질러 상위 티어가 완전 열등재가 된다. 졸업량 배율이라야 상위 티어가 희귀+ 1마리당 200M 로
+    /// 하위 반복 구매보다 싸다.
     static func price(guaranteeing tier: Rarity?) -> Int {
         guard let tier else { return price }
         let multiplier = Double(PokemonBalance.graduationTotal(tier)) / Double(PokemonBalance.graduationTotal(.common))

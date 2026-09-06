@@ -89,7 +89,8 @@ struct LinearClient: Sendable {
 /// Pure reward math for Linear completions → companion XP.
 enum LinearRewards {
     /// XP per newly completed issue (growth only — not `usedSinceInstall`).
-    static let xpPerIssue = 2_000_000
+    /// Upstream 2M → scaled snack, same tier as Rare Candy / time-open XP.
+    static let xpPerIssue = EconomyScale.tokens(2_000_000)
     /// How far back to look for completions on each poll.
     static let lookbackDays = 14
     /// Cap persisted credited IDs so saves stay bounded.

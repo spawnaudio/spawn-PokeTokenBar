@@ -6,13 +6,13 @@ import Foundation
 /// meter as token usage (`eggUsage` / `applyUsage`), without inflating `usedSinceInstall`
 /// (shop wallet / real-usage stats stay usage-only — same rule as Rare Candy).
 enum TimeOpenXP {
-    /// Tokens per minute of credited open time.
-    /// ~600k/hour → ~4.8M per 8h workday (just under one egg hatch at 5M).
-    static let tokensPerMinute = 10_000
+    /// Tokens per minute of credited open time (upstream ints, then `EconomyScale`).
+    /// ~600k/hour → ~4.8M per 8h workday upstream (just under one egg hatch at 5M).
+    static let tokensPerMinute = EconomyScale.tokens(10_000)
     /// Cap credited gap so sleep/wake does not dump hours of AFK XP in one tick.
     static let maxGapSeconds: TimeInterval = 5 * 60
     /// Per calendar-day cap (local `yyyy-MM-dd`) so idle open cannot outpace real usage forever.
-    static let dailyCap = 5_000_000
+    static let dailyCap = EconomyScale.tokens(5_000_000)
 
     struct Credit: Equatable, Sendable {
         var xp: Int
