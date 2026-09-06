@@ -219,17 +219,19 @@ final class RareCandyStoreTests: XCTestCase {
 
     // MARK: 사용
 
-    /// 사탕 XP < 최소 진화 임계 → 진화 못 시키는 케이스는 부분 진행(.progressed), 통계 불변.
+    /// 1단계 이상에선 사탕 1개가 임계 미달일 수 있어 부분 진행(.progressed), 통계는 불변.
     func testUseProgressesWithoutEvolution() async {
         let s = store(rcLinear3)
         await s.hatch(baseID: 1)
+        let firstEvo = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
+        s.applyUsage(firstEvo)   // stage1 진입
         giveCandies(s, 1)
         XCTAssertEqual(s.rareCandyCount, 1)
         let before = s.state.usedSinceInstall
         let result = s.useRareCandy()
         XCTAssertEqual(result, .progressed)
         XCTAssertEqual(s.state.active?.usedAtStage, RareCandy.xp)
-        XCTAssertEqual(s.state.active?.stageIndex, 0)
+        XCTAssertEqual(s.state.active?.stageIndex, 1)
         XCTAssertEqual(s.rareCandyCount, 0, "재고 1 소모")
         XCTAssertEqual(s.state.usedSinceInstall, before, "사탕 XP 는 실사용 통계에 안 잡힘")
     }
@@ -344,22 +346,15 @@ final class RareCandyStoreTests: XCTestCase {
         XCTAssertEqual(s.ownedItems.first?.count, 3)
     }
 
-    /// 데모 시나리오(구구 3형태, usedAtStage 100M, 사탕 3): 진화 → 부분성장 → 진화, 그 뒤 재고 0.
+    /// 데모 시나리오(3형태, 사탕 3개): 진화 → 부분성장 → 진화, 그 뒤 재고 0.
     func testSequentialCandyUseMatchesDemo() async {
         let s = store(rcLinear3)
         await s.hatch(baseID: 1)
-        // Snack-sized candy XP (scaled 2.5M upstream) needs threshold-relative setup —
-        // applyUsage(RareCandy.xp) alone no longer reaches stage0 under EconomyScale.
-        let stage0 = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
-        let stage1 = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 1)
-        s.applyUsage(stage0 - RareCandy.xp)             // stage0 임계 직전
         giveCandies(s, 3)
         XCTAssertEqual(s.useRareCandy(), .evolved)     // 임계 돌파 → stage1
         XCTAssertEqual(s.state.active?.stageIndex, 1)
-        XCTAssertEqual(s.useRareCandy(), .progressed)  // snack << stage1 → 부분성장
+        XCTAssertEqual(s.useRareCandy(), .progressed)  // stage1에서 부분성장
         XCTAssertEqual(s.state.active?.stageIndex, 1)
-        let used = s.state.active!.usedAtStage
-        s.applyUsage(stage1 - used - RareCandy.xp)     // stage1 임계 직전
         XCTAssertEqual(s.useRareCandy(), .evolved)     // 임계 돌파 → stage2
         XCTAssertEqual(s.state.active?.stageIndex, 2)
         XCTAssertEqual(s.rareCandyCount, 0)

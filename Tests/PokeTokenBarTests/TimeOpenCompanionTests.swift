@@ -47,7 +47,7 @@ final class TimeOpenCompanionTests: XCTestCase {
         XCTAssertEqual(store.state.usedSinceInstall, 0)
         XCTAssertNotNil(store.state.lastTimeOpenAwardAt)
 
-        clock.now = t0.addingTimeInterval(120)
+        clock.now = t0.addingTimeInterval(TimeOpenXP.awardIntervalSeconds)
         store.update(
             todayTokensByProvider: ["test": 0],
             todayDate: day,
@@ -56,7 +56,16 @@ final class TimeOpenCompanionTests: XCTestCase {
             limitWarning: false,
             hasUsageData: true)
 
-        XCTAssertEqual(store.state.eggUsage, TimeOpenXP.tokensPerMinute * 2)
+        clock.now = t0.addingTimeInterval(TimeOpenXP.awardIntervalSeconds * 2)
+        store.update(
+            todayTokensByProvider: ["test": 0],
+            todayDate: day,
+            monthTotal: 0,
+            burnTier: .idle,
+            limitWarning: false,
+            hasUsageData: true)
+
+        XCTAssertEqual(store.state.eggUsage, TimeOpenXP.tokensPerAward * 2)
         XCTAssertEqual(store.state.usedSinceInstall, 0,
                        "time XP must not inflate shop/usage totals")
     }

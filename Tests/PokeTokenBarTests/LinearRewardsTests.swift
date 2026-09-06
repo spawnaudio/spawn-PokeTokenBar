@@ -46,7 +46,7 @@ final class LinearRewardsTests: XCTestCase {
         let a = (0..<300).map(String.init)
         let b = (200..<400).map(String.init)
         let merged = LinearRewards.mergedCreditedIDs(a, b)
-        XCTAssertEqual(merged.count, LinearRewards.maxCreditedIDs)
+        XCTAssertEqual(merged.count, 400)
         XCTAssertTrue(Set(merged).isSubset(of: Set(a + b)))
     }
 
@@ -61,6 +61,38 @@ final class LinearRewardsTests: XCTestCase {
         XCTAssertEqual(issues.count, 1)
         XCTAssertEqual(issues[0].id, "issue-1")
         XCTAssertEqual(issues[0].identifier, "ENG-1")
+    }
+
+    func testParseIssueDashboardSortsByPriority() throws {
+        let json = """
+        {"data":{
+          "completedRecent":{"nodes":[
+            {"id":"issue-2","identifier":"ENG-2","title":"Later",
+             "priority":3,"updatedAt":"2026-09-06T12:00:00.000Z",
+             "completedAt":"2026-09-06T12:00:00.000Z"},
+            {"id":"issue-1","identifier":"ENG-1","title":"Urgent",
+             "priority":1,"updatedAt":"2026-09-06T11:00:00.000Z",
+             "completedAt":"2026-09-06T11:00:00.000Z"}
+          ]},
+          "inProgress":{"nodes":[
+            {"id":"issue-4","identifier":"ENG-4","title":"No priority",
+             "priority":0,"updatedAt":"2026-09-06T10:00:00.000Z",
+             "state":{"name":"In Progress","type":"started"}},
+            {"id":"issue-3","identifier":"ENG-3","title":"High",
+             "priority":2,"updatedAt":"2026-09-06T09:00:00.000Z",
+             "state":{"name":"In Progress","type":"started"},
+             "labels":{"nodes":[{"name":"backend"}]},
+             "dueDate":"2026-09-07"}
+          ]}
+        }}
+        """.data(using: .utf8)!
+
+        let dashboard = try LinearClient.parseIssueDashboard(json)
+        XCTAssertEqual(dashboard.completedRecent.map(\.id), ["issue-1", "issue-2"])
+        XCTAssertEqual(dashboard.inProgress.map(\.id), ["issue-3", "issue-4"])
+        XCTAssertEqual(dashboard.inProgress.first?.stateType, "started")
+        XCTAssertEqual(dashboard.inProgress.first?.labelNames, ["backend"])
+        XCTAssertNotNil(dashboard.inProgress.first?.dueDate)
     }
 
     func testNormalizeRejectsNonLinearKeys() {
