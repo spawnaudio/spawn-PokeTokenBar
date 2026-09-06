@@ -196,6 +196,9 @@ enum SaveTransfer {
         state.language = current.language
         state.candyGrantTier = mergedGrantTier(imported.candyGrantTier, current.candyGrantTier)
         state.candyFeatureSeeded = imported.candyFeatureSeeded || current.candyFeatureSeeded
+        state.linearCreditedIssueIDs = LinearRewards.mergedCreditedIDs(
+            imported.linearCreditedIssueIDs, current.linearCreditedIssueIDs)
+        state.linearIntegrationSeeded = imported.linearIntegrationSeeded || current.linearIntegrationSeeded
         // Time-open XP is a per-device clock ledger — never import another Mac's baseline
         // or you silently skip hours (or dump a gap) on the first tick after import.
         state.lastTimeOpenAwardAt = nil

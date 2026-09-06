@@ -575,6 +575,10 @@ struct CompanionState: Codable, Sendable {
     var lastTimeOpenAwardAt: Date? = nil
     var timeOpenAwardDay = ""
     var timeOpenAwardedToday = 0
+    /// Linear issue IDs already credited (account ledger — merge on save import).
+    var linearCreditedIssueIDs: [String] = []
+    /// First successful Linear poll seeds IDs without XP (no backfill dump).
+    var linearIntegrationSeeded = false
 
     init() {}
 
@@ -613,6 +617,8 @@ struct CompanionState: Codable, Sendable {
         lastTimeOpenAwardAt = c.lenientOptional(Date.self, forKey: .lastTimeOpenAwardAt)
         timeOpenAwardDay = c.lenient(String.self, forKey: .timeOpenAwardDay, default: "")
         timeOpenAwardedToday = c.lenient(Int.self, forKey: .timeOpenAwardedToday, default: 0)
+        linearCreditedIssueIDs = c.lenient([String].self, forKey: .linearCreditedIssueIDs, default: [])
+        linearIntegrationSeeded = c.lenient(Bool.self, forKey: .linearIntegrationSeeded, default: false)
     }
 
     /// 졸업 기록 또는 현재 개체가 실제로 도달한 단계에 이 종이 포함되는가.

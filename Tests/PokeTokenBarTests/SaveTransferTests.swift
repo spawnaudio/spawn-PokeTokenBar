@@ -517,7 +517,8 @@ final class SaveTransferTests: XCTestCase {
                                      "collectedFinals", "inventory"]
         let deviceLedger: Set<String> = ["installBaselineSet", "claimedTodayTokensByProvider", "lastDate",
                                      "lastTimeOpenAwardAt", "timeOpenAwardDay", "timeOpenAwardedToday"]
-        let accountLedger: Set<String> = ["candyGrantTier", "candyFeatureSeeded"]
+        let accountLedger: Set<String> = ["candyGrantTier", "candyFeatureSeeded",
+                                      "linearCreditedIssueIDs", "linearIntegrationSeeded"]
         let devicePreference: Set<String> = ["language"]
 
         let classified = progress.union(deviceLedger).union(accountLedger).union(devicePreference)

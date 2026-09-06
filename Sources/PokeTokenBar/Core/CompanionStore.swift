@@ -857,6 +857,23 @@ final class CompanionStore {
     }
 
 
+    
+    /// Credit XP for newly completed Linear issues. Seed poll records IDs with 0 XP.
+    @discardableResult
+    func creditLinearCompletions(_ issues: [LinearCompletedIssue]) -> LinearRewards.Outcome {
+        let outcome = LinearRewards.evaluate(
+            issues: issues,
+            alreadyCredited: state.linearCreditedIssueIDs,
+            seeded: state.linearIntegrationSeeded)
+        state.linearCreditedIssueIDs = outcome.creditedIDs
+        state.linearIntegrationSeeded = outcome.seeded
+        if outcome.xp > 0 {
+            applyProgressXP(outcome.xp)
+        }
+        save()
+        return outcome
+    }
+
     func grantCandies(from windows: [CandyWindow], limitsReady: Bool) {
         guard limitsReady else { return }
         if !state.candyFeatureSeeded {

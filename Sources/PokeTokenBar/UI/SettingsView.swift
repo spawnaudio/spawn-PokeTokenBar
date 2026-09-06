@@ -21,6 +21,7 @@ struct SettingsView: View {
     /// 두 번째 진입부터 접힌 채로 열린다. onAppear 에서 1회 반영한다.
     @State private var didApplyStartExpanded = false
     @State private var sessionKeyInput = ""
+    @State private var linearAPIKeyInput = ""
     @State private var isCheckingUpdate = false
     @State private var didCheckUpdate = false
     @State private var selectedScanProviderID = "claude_code"
@@ -469,7 +470,72 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func advancedGroup(_ store: UsageStore) -> some View {
+    
+    @ViewBuilder
+    private func linearIntegrationRows(_ store: UsageStore) -> some View {
+        @Bindable var store = store
+        groupRow {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(l.linearIntegrationLabel)
+                Text(l.linearIntegrationHint).font(.caption2).foregroundStyle(.tertiary)
+            }
+            Spacer()
+            Toggle("", isOn: $store.linearIntegrationEnabled)
+                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+        Divider()
+        groupRow {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(l.linearAPIKeyLabel)
+                    if store.linearAPIKeyConfigured {
+                        Text(l.linearAPIKeySaved)
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Spacer()
+        }
+        SecureField(store.linearAPIKeyConfigured ? "••••••••" : "lin_api_…", text: $linearAPIKeyInput)
+            .textFieldStyle(.roundedBorder)
+            .padding(.horizontal, 12)
+        HStack {
+            Button(l.save) {
+                let pasted = linearAPIKeyInput
+                Task {
+                    await store.saveLinearAPIKey(pasted)
+                    if store.linearAPIKeyError == nil { linearAPIKeyInput = "" }
+                }
+            }
+            .disabled(linearAPIKeyInput.isEmpty || store.isValidatingLinearAPIKey)
+            if store.linearAPIKeyConfigured {
+                Button(l.delete, role: .destructive) {
+                    linearAPIKeyInput = ""
+                    store.clearLinearAPIKey()
+                }
+            }
+            if store.isValidatingLinearAPIKey {
+                ProgressView().controlSize(.small)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.bottom, 6)
+        if store.linearAPIKeyError == "malformed" {
+            Text(l.linearAPIKeyMalformed)
+                .font(.caption2).foregroundStyle(.red)
+                .padding(.horizontal, 12)
+        } else if store.linearAPIKeyError == "invalid" {
+            Text(l.linearAPIKeyInvalid)
+                .font(.caption2).foregroundStyle(.red)
+                .padding(.horizontal, 12)
+        } else if store.linearAPIKeyConfigured {
+            Text(l.sessionKeyStorageNote)
+                .font(.caption2).foregroundStyle(.tertiary)
+                .padding(.horizontal, 12).padding(.bottom, 4)
+        }
+    }
+
+private func advancedGroup(_ store: UsageStore) -> some View {
         @Bindable var store = store
         settingsSection(l.advancedSectionTitle) {
             Button {
@@ -498,6 +564,8 @@ struct SettingsView: View {
                 sessionKeyRows(store)
                     // 재시작 후엔 후보 목록이 비어 있어 조직을 바꿀 수 없다 — 열 때 한 번 채운다.
                     .task { await store.refreshSessionOrganizations() }
+                Divider()
+                linearIntegrationRows(store)
                 Divider()
                 groupRow {
                     VStack(alignment: .leading, spacing: 1) {
