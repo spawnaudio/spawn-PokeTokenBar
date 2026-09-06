@@ -6,13 +6,15 @@ import Foundation
 /// meter as token usage (`eggUsage` / `applyUsage`), without inflating `usedSinceInstall`
 /// (shop wallet / real-usage stats stay usage-only — same rule as Rare Candy).
 enum TimeOpenXP {
-    /// Tokens per minute of credited open time (upstream ints, then `EconomyScale`).
-    /// ~600k/hour → ~4.8M per 8h workday upstream (just under one egg hatch at 5M).
-    static let tokensPerMinute = EconomyScale.tokens(10_000)
-    /// Cap credited gap so sleep/wake does not dump hours of AFK XP in one tick.
-    static let maxGapSeconds: TimeInterval = 5 * 60
-    /// Per calendar-day cap (local `yyyy-MM-dd`) so idle open cannot outpace real usage forever.
-    static let dailyCap = EconomyScale.tokens(5_000_000)
+    /// Reward cadence: +1M growth XP every 10 minutes of active open time.
+    static let awardIntervalSeconds: TimeInterval = 10 * 60
+    static let tokensPerAward = 1_000_000
+    /// Cap catch-up so wake from sleep cannot dump hours of AFK XP at once.
+    /// We keep only one interval worth of backlog.
+    static let maxGapSeconds: TimeInterval = awardIntervalSeconds
+    /// Per calendar-day cap (local `yyyy-MM-dd`) so idle open cannot outpace usage forever.
+    /// 144 intervals/day × 1M.
+    static let dailyCap = tokensPerAward * 144
 
     struct Credit: Equatable, Sendable {
         var xp: Int
@@ -40,16 +42,23 @@ enum TimeOpenXP {
             // Seed only — avoid a huge catch-up grant on first enable / upgrade / import.
             return Credit(xp: 0, awardedToday: awarded, day: dayKey, awardedAt: now)
         }
-        let elapsed = now.timeIntervalSince(last)
+        // Drop backlog older than maxGap so sleep/wake doesn't leak hours of AFK credit.
+        let effectiveLast = max(last, now.addingTimeInterval(-maxGapSeconds))
+        let elapsed = now.timeIntervalSince(effectiveLast)
         guard elapsed > 0 else {
-            return Credit(xp: 0, awardedToday: awarded, day: dayKey, awardedAt: last)
+            return Credit(xp: 0, awardedToday: awarded, day: dayKey, awardedAt: effectiveLast)
         }
         guard awarded < dailyCap else {
             return Credit(xp: 0, awardedToday: awarded, day: dayKey, awardedAt: now)
         }
-        let creditedSeconds = min(elapsed, maxGapSeconds)
-        let raw = Int((creditedSeconds / 60.0) * Double(tokensPerMinute))
-        let xp = min(max(0, raw), dailyCap - awarded)
-        return Credit(xp: xp, awardedToday: awarded + xp, day: dayKey, awardedAt: now)
+        let awards = Int(elapsed / awardIntervalSeconds)
+        guard awards > 0 else {
+            return Credit(xp: 0, awardedToday: awarded, day: dayKey, awardedAt: effectiveLast)
+        }
+        let raw = awards * tokensPerAward
+        let xp = min(raw, dailyCap - awarded)
+        let creditedIntervals = xp / tokensPerAward
+        let awardedAt = effectiveLast.addingTimeInterval(Double(creditedIntervals) * awardIntervalSeconds)
+        return Credit(xp: xp, awardedToday: awarded + xp, day: dayKey, awardedAt: awardedAt)
     }
 }

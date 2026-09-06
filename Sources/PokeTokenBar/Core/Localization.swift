@@ -21,6 +21,8 @@ struct L {
 
     // MARK: 탭
     var home: String { t("홈", "Home", "ホーム", "Inicio", "Accueil", "Início", "Startseite") }
+    var linearTab: String { t("Linear", "Linear", "Linear", "Linear", "Linear", "Linear", "Linear") }
+    var timeXPTab: String { t("시간 XP", "Time XP", "時間XP", "XP tiempo", "XP temps", "XP tempo", "Zeit-XP") }
     /// 상위 탭 이름 — 안에서 도감/포획 로그를 세그먼트로 전환하므로 둘을 아우르는 말이어야 한다.
     /// (ko 가 "도감"이면 탭과 세그먼트가 같은 이름이 돼 en/ja 의 Collection/コレクション 과도 어긋난다.)
     var collection: String { t("컬렉션", "Collection", "コレクション", "Colección", "Collection", "Coleção", "Sammlung") }
@@ -303,6 +305,32 @@ struct L {
     var linearAPIKeySaved: String { t("설정됨", "Saved", "設定済み", "Guardada", "Enregistrée", "Salva", "Gespeichert") }
     var linearAPIKeyMalformed: String { t("키 형식이 아닙니다 (lin_api_ 로 시작).", "That isn’t an API key (should start with lin_api_).", "キー形式ではありません（lin_api_ で開始）。", "Eso no es una clave API (debe empezar por lin_api_).", "Ce n’est pas une clé API (doit commencer par lin_api_).", "Isso não é uma chave de API (deve começar com lin_api_).", "Das ist kein API-Schlüssel (sollte mit lin_api_ beginnen).") }
     var linearAPIKeyInvalid: String { t("Linear가 키를 거부했습니다. 권한을 확인하세요.", "Linear rejected that key. Check its permissions.", "Linearがキーを拒否しました。権限を確認してください。", "Linear rechazó esa clave. Revisa sus permisos.", "Linear a rejeté cette clé. Vérifie ses permissions.", "O Linear rejeitou essa chave. Verifique as permissões.", "Linear hat diesen Schlüssel abgelehnt. Berechtigungen prüfen.") }
+    var linearIssuesTitle: String { t("Linear 이슈", "Linear issues", "Linear課題", "Issues de Linear", "Issues Linear", "Issues do Linear", "Linear-Issues") }
+    var linearCompletedTodayTab: String { t("오늘 완료", "Completed today", "今日完了", "Completadas hoy", "Terminées aujourd'hui", "Concluídas hoje", "Heute abgeschlossen") }
+    var linearInProgressTab: String { t("진행 중", "In progress", "進行中", "En curso", "En cours", "Em andamento", "In Arbeit") }
+    var linearIssuesNeedsSetup: String { t("설정에서 Linear API 키를 저장하고 통합을 켜면 표시됩니다.", "Save your Linear API key and enable Linear integration in Settings to view issues.", "設定でLinear APIキーを保存して連携を有効にすると表示されます。", "Guarda tu clave API de Linear y activa la integración en Ajustes para ver issues.", "Enregistre ta clé API Linear et active l’intégration dans Réglages pour afficher les issues.", "Salve sua chave API do Linear e ative a integração em Ajustes para ver issues.", "Speichere deinen Linear-API-Schlüssel und aktiviere die Integration in den Einstellungen, um Issues zu sehen.") }
+    var linearIssuesEmptyCompleted: String { t("오늘 완료된 이슈가 없습니다.", "No issues completed today.", "本日完了した課題はありません。", "No hay issues completadas hoy.", "Aucune issue terminée aujourd'hui.", "Nenhuma issue concluída hoje.", "Heute keine abgeschlossenen Issues.") }
+    var linearIssuesEmptyInProgress: String { t("현재 진행 중인 이슈가 없습니다.", "No issues currently in progress.", "現在進行中の課題はありません。", "No hay issues en curso.", "Aucune issue en cours actuellement.", "Nenhuma issue em andamento agora.", "Aktuell keine Issues in Arbeit.") }
+    var linearIssuesSyncFailed: String { t("Linear 동기화에 실패했습니다. 잠시 후 다시 시도하세요.", "Failed to sync with Linear. Try again shortly.", "Linearとの同期に失敗しました。しばらくして再試行してください。", "No se pudo sincronizar con Linear. Inténtalo de nuevo en breve.", "La synchronisation Linear a échoué. Réessaie dans un instant.", "Falha ao sincronizar com o Linear. Tente novamente em instantes.", "Synchronisierung mit Linear fehlgeschlagen. Bitte gleich erneut versuchen.") }
+    var linearOpenIssue: String { t("Linear에서 열기", "Open in Linear", "Linearで開く", "Abrir en Linear", "Ouvrir dans Linear", "Abrir no Linear", "In Linear öffnen") }
+    var linearLastSynced: String { t("마지막 동기화", "Last synced", "最終同期", "Última sincronización", "Dernière synchronisation", "Última sincronização", "Zuletzt synchronisiert") }
+    func linearPriority(_ value: Int?) -> String {
+        guard let value else { return t("우선순위 없음", "No priority", "優先度なし", "Sin prioridad", "Sans priorité", "Sem prioridade", "Keine Priorität") }
+        switch value {
+        case 1: return t("P1 긴급", "P1 Urgent", "P1 緊急", "P1 Urgente", "P1 Urgent", "P1 Urgente", "P1 Dringend")
+        case 2: return t("P2 높음", "P2 High", "P2 高", "P2 Alta", "P2 Haute", "P2 Alta", "P2 Hoch")
+        case 3: return t("P3 보통", "P3 Medium", "P3 中", "P3 Media", "P3 Moyenne", "P3 Média", "P3 Mittel")
+        case 4: return t("P4 낮음", "P4 Low", "P4 低", "P4 Baja", "P4 Basse", "P4 Baixa", "P4 Niedrig")
+        default: return "P\(value)"
+        }
+    }
+    var timeXPTitle: String { t("시간 XP", "Time XP", "時間XP", "XP tiempo", "XP temps", "XP tempo", "Zeit-XP") }
+    var timeXPRewardRate: String { t("보상: 10분마다 +1M 토큰", "Reward: +1M tokens every 10 minutes", "報酬: 10分ごとに+1Mトークン", "Recompensa: +1M tokens cada 10 minutos", "Récompense : +1M tokens toutes les 10 minutes", "Recompensa: +1M tokens a cada 10 minutos", "Belohnung: +1M Tokens alle 10 Minuten") }
+    var timeXPTodayAwarded: String { t("오늘 획득 XP", "Today's XP", "本日の獲得XP", "XP de hoy", "XP du jour", "XP de hoje", "Heutige XP") }
+    var timeXPDailyCap: String { t("일일 상한", "Daily cap", "1日上限", "Límite diario", "Plafond quotidien", "Limite diário", "Tageslimit") }
+    var timeXPNextAward: String { t("다음 지급", "Next award", "次の付与", "Próxima recompensa", "Prochaine récompense", "Próxima recompensa", "Nächste Belohnung") }
+    var timeXPPaused: String { t("꺼짐", "Off", "オフ", "Desactivado", "Désactivé", "Desligado", "Aus") }
+    var timeXPWaiting: String { t("기준 시간 수집 중", "Waiting for first tick", "初回ティック待機中", "Esperando primer tick", "En attente du premier tick", "Aguardando primeiro tick", "Warte auf ersten Tick") }
 
     var statusChecksLabel: String { t("프로바이더 상태 확인", "Provider status checks", "プロバイダー状態チェック", "Comprobación de estado de proveedores", "Vérification de l'état des fournisseurs", "Verificação de status dos provedores", "Anbieterstatus prüfen") }
     var statusChecksHint: String { t("Claude·OpenAI 장애를 팝오버에 표시 (알림 아님)", "Show Claude / OpenAI incidents in the popover (not a notification)", "Claude・OpenAIの障害をポップオーバーに表示（通知ではない）", "Muestra incidentes de Claude/OpenAI en el popover (no es una notificación)", "Affiche les incidents Claude / OpenAI dans le popover (pas une notification)", "Mostra incidentes do Claude/OpenAI no painel (não é uma notificação)", "Störungen bei Claude / OpenAI im Popover anzeigen (keine Benachrichtigung)") }
@@ -879,6 +907,16 @@ struct L {
                  "Laisse partir ton Pokémon actuel pour un œuf garanti \(r) ou mieux.",
                  "Solte seu Pokémon atual e ganhe um ovo que garante \(r) ou melhor.",
                  "Verabschiede dein aktuelles Pokémon und erhalte ein Ei, aus dem garantiert ein Pokémon der Seltenheitsstufe \(r) oder höher schlüpft.")
+    }
+    /// 알 상태의 상점 알 카드 비활성 사유 — 항목은 보이되 구매 버튼 아래에 한 줄로 붙는다(EggCard).
+    var eggShopLockedHint: String {
+        t("지금 품고 있는 알이 부화하면 살 수 있어요.",
+          "Available once your current egg hatches.",
+          "いま抱えているタマゴが孵ると購入できます。",
+          "Disponible cuando eclosione tu huevo actual.",
+          "Disponible une fois ton œuf actuel éclos.",
+          "Disponível quando seu ovo atual chocar.",
+          "Verfügbar, sobald dein aktuelles Ei geschlüpft ist.")
     }
     /// 인큐베이션 중 표시하는 보증 배지 — 어떤 알을 품고 있는지 한 줄로.
     func eggGuaranteeHint(_ tier: Rarity) -> String {

@@ -14,41 +14,51 @@ final class TimeOpenXPTests: XCTestCase {
         XCTAssertEqual(credit.awardedToday, 0)
     }
 
-    func testOneMinuteAwardsTokensPerMinute() {
+    func testOneIntervalAwardsTokensPerAward() {
         let credit = TimeOpenXP.credit(
-            now: t0.addingTimeInterval(60),
+            now: t0.addingTimeInterval(TimeOpenXP.awardIntervalSeconds),
             day: day,
             lastAwardAt: t0,
             awardDay: day,
             awardedToday: 0)
-        XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerMinute)
-        XCTAssertEqual(credit.awardedToday, TimeOpenXP.tokensPerMinute)
+        XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerAward)
+        XCTAssertEqual(credit.awardedToday, TimeOpenXP.tokensPerAward)
     }
 
-    func testGapIsCappedAtMaxGapSeconds() {
+    func testBelowIntervalDoesNotAwardYet() {
+        let credit = TimeOpenXP.credit(
+            now: t0.addingTimeInterval(TimeOpenXP.awardIntervalSeconds - 1),
+            day: day,
+            lastAwardAt: t0,
+            awardDay: day,
+            awardedToday: 0)
+        XCTAssertEqual(credit.xp, 0)
+        XCTAssertEqual(credit.awardedToday, 0)
+    }
+
+    func testGapIsCappedToSingleInterval() {
         let credit = TimeOpenXP.credit(
             now: t0.addingTimeInterval(3_600),
             day: day,
             lastAwardAt: t0,
             awardDay: day,
             awardedToday: 0)
-        let expected = Int((TimeOpenXP.maxGapSeconds / 60.0) * Double(TimeOpenXP.tokensPerMinute))
-        XCTAssertEqual(credit.xp, expected)
+        XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerAward)
     }
 
     func testDailyCapStopsFurtherAwards() {
-        let almost = TimeOpenXP.dailyCap - 100
+        let almost = TimeOpenXP.dailyCap - TimeOpenXP.tokensPerAward
         let credit = TimeOpenXP.credit(
-            now: t0.addingTimeInterval(60),
+            now: t0.addingTimeInterval(TimeOpenXP.awardIntervalSeconds),
             day: day,
             lastAwardAt: t0,
             awardDay: day,
             awardedToday: almost)
-        XCTAssertEqual(credit.xp, 100)
+        XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerAward)
         XCTAssertEqual(credit.awardedToday, TimeOpenXP.dailyCap)
 
         let next = TimeOpenXP.credit(
-            now: t0.addingTimeInterval(120),
+            now: t0.addingTimeInterval(TimeOpenXP.awardIntervalSeconds * 2),
             day: day,
             lastAwardAt: credit.awardedAt,
             awardDay: day,
@@ -59,13 +69,13 @@ final class TimeOpenXPTests: XCTestCase {
 
     func testNewDayResetsDailyCounter() {
         let credit = TimeOpenXP.credit(
-            now: t0.addingTimeInterval(60),
+            now: t0.addingTimeInterval(TimeOpenXP.awardIntervalSeconds),
             day: "2026-09-07",
             lastAwardAt: t0,
             awardDay: day,
             awardedToday: TimeOpenXP.dailyCap)
         XCTAssertEqual(credit.day, "2026-09-07")
-        XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerMinute)
-        XCTAssertEqual(credit.awardedToday, TimeOpenXP.tokensPerMinute)
+        XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerAward)
+        XCTAssertEqual(credit.awardedToday, TimeOpenXP.tokensPerAward)
     }
 }

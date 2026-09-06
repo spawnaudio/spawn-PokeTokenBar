@@ -171,12 +171,10 @@ enum ItemKind: String, Codable, Sendable, CaseIterable {
 
 /// 이상한 사탕 밸런스 상수.
 enum RareCandy {
-    /// 사용 시 현재 포켓몬에 주입하는 XP(토큰 환산). Upstream 2.5M → 스케일 후 스낵 크기.
-    /// 최소 진화 임계(커먼 3형태 1단계)보다 작아 사탕 1개는 최대 1단계만 올린다(연쇄·졸업 폭주 없음)
-    /// — 임계 직전에서만 진화를 넘긴다. applyUsage 로 주입 → 이월/진화/졸업 자동.
-    /// (구버전 upstream 100M 은 "거의 1단계"에 가까워 상시 진화 압력이 커서 2.5M 스낵으로 낮춤 —
-    /// Linear 완료 보상·타임오픈 XP 와 같은 체급.)
-    static let xp = EconomyScale.tokens(2_500_000)
+    /// 사용 시 현재 포켓몬에 주입하는 XP(토큰 환산).
+    /// 커먼 3형태의 1단계(1.25M)는 넘길 수 있지만 2단계(2.5M)는 못 넘기므로,
+    /// 사탕 1개가 최대 1단계만 진행시키는 불변식은 유지된다.
+    static let xp = 1_500_000
     /// 주간 한도 100% 도달 시 지급 개수(세션급은 1개).
     static let weeklyGrant = 5
     /// 상점 구매가(재화 = 사용한 토큰: usedSinceInstall − spentTokens).

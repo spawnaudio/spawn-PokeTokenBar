@@ -121,7 +121,10 @@ final class UsageStore {
     }
     /// Poll Linear for completed issues and award companion XP. Default off (needs API key).
     var linearIntegrationEnabled: Bool {
-        didSet { defaults.set(linearIntegrationEnabled, forKey: "linearIntegrationEnabled") }
+        didSet {
+            defaults.set(linearIntegrationEnabled, forKey: "linearIntegrationEnabled")
+            if !linearIntegrationEnabled { clearLinearIssueSnapshot() }
+        }
     }
     /// 새 버전 알림(팝오버 업데이트 배너) 표시 여부 — 기본 켬. 끄면 배너 숨김(수동 확인은 설정에서 가능).
     var updateNotificationsEnabled: Bool {
@@ -835,6 +838,12 @@ final class UsageStore {
     var linearAPIKeyConfigured = false
     var linearAPIKeyError: String?
     var isValidatingLinearAPIKey = false
+    private(set) var isRefreshingLinearIssues = false
+    private(set) var linearCompletedTodayIssues: [LinearIssueSummary] = []
+    private(set) var linearInProgressIssues: [LinearIssueSummary] = []
+    private(set) var linearIssuesUpdatedAt: Date?
+    private(set) var linearIssuesError: String?
+    private var linearRecentCompletedIssues: [LinearCompletedIssue] = []
     private let linearAPIKeys = LinearAPIKeyStore()
     private var linearClient = LinearClient()
 
@@ -910,13 +919,23 @@ final class UsageStore {
         defer { isValidatingLinearAPIKey = false }
         do {
             let key = try LinearAPIKeyStore.normalize(raw)
-            // Probe with a short lookback so typos fail fast.
-            _ = try await linearClient.fetchCompletedIssues(
-                apiKey: key, since: Date().addingTimeInterval(-86_400))
+            // Validate auth with a lightweight probe. Non-auth failures (timeouts, transient
+            // API errors) should not block saving a valid key.
+            do {
+                try await linearClient.validateAPIKey(apiKey: key)
+            } catch {
+                if Self.shouldRejectLinearAPIKeyValidation(error) { throw error }
+                AppLog.write("linear key probe inconclusive (saving key): \(error)")
+            }
             try linearAPIKeys.save(.init(key: key))
             linearAPIKeyConfigured = true
+            linearIssuesError = nil
         } catch LinearAPIError.malformedKey {
             linearAPIKeyError = "malformed"
+        } catch LinearAPIError.unauthorized {
+            linearAPIKeyError = "invalid"
+        } catch LinearAPIError.httpStatus(let status) where status == 401 || status == 403 {
+            linearAPIKeyError = "invalid"
         } catch {
             linearAPIKeyError = "invalid"
         }
@@ -926,19 +945,63 @@ final class UsageStore {
         linearAPIKeys.clear()
         linearAPIKeyConfigured = false
         linearAPIKeyError = nil
+        clearLinearIssueSnapshot()
+    }
+
+    /// Refreshes Linear panel data and returns recent completions for reward crediting.
+    @discardableResult
+    func refreshLinearIssues(now: Date = Date()) async -> [LinearCompletedIssue] {
+        guard linearIntegrationEnabled else {
+            clearLinearIssueSnapshot()
+            return []
+        }
+        guard let key = linearAPIKeys.load()?.key else {
+            clearLinearIssueSnapshot()
+            return []
+        }
+        if isRefreshingLinearIssues { return linearRecentCompletedIssues }
+
+        isRefreshingLinearIssues = true
+        defer { isRefreshingLinearIssues = false }
+
+        let since = Calendar.current.date(
+            byAdding: .day, value: -LinearRewards.lookbackDays, to: now) ?? now
+        do {
+            let dashboard = try await linearClient.fetchIssueDashboard(apiKey: key, completedSince: since)
+            linearRecentCompletedIssues = dashboard.completedRecent.compactMap { issue in
+                guard let completedAt = issue.completedAt else { return nil }
+                return LinearCompletedIssue(
+                    id: issue.id,
+                    identifier: issue.identifier,
+                    title: issue.title,
+                    completedAt: completedAt)
+            }
+            let calendar = Calendar.current
+            linearCompletedTodayIssues = dashboard.completedRecent.filter { issue in
+                guard let completedAt = issue.completedAt else { return false }
+                return calendar.isDate(completedAt, inSameDayAs: now)
+            }
+            linearInProgressIssues = dashboard.inProgress
+            linearIssuesUpdatedAt = Date()
+            linearIssuesError = nil
+            return linearRecentCompletedIssues
+        } catch {
+            linearIssuesError = "fetch_failed"
+            return []
+        }
     }
 
     /// Fetch + return completions when integration is on and a key is stored.
     func fetchLinearCompletionsForCompanion() async -> [LinearCompletedIssue] {
-        guard linearIntegrationEnabled,
-              let key = linearAPIKeys.load()?.key else { return [] }
-        let since = Calendar.current.date(
-            byAdding: .day, value: -LinearRewards.lookbackDays, to: Date()) ?? Date()
-        do {
-            return try await linearClient.fetchCompletedIssues(apiKey: key, since: since)
-        } catch {
-            return []
-        }
+        await refreshLinearIssues()
+    }
+
+    private func clearLinearIssueSnapshot() {
+        linearRecentCompletedIssues = []
+        linearCompletedTodayIssues = []
+        linearInProgressIssues = []
+        linearIssuesUpdatedAt = nil
+        linearIssuesError = nil
     }
 
 
@@ -1047,6 +1110,15 @@ final class UsageStore {
         case .sessionKeyNoOrganization:
             return l.sessionKeyNoOrgError
         }
+    }
+
+    /// True only when a key probe proves the credential is invalid.
+    nonisolated static func shouldRejectLinearAPIKeyValidation(_ error: any Error) -> Bool {
+        if case LinearAPIError.unauthorized = error { return true }
+        if case LinearAPIError.httpStatus(let status) = error, status == 401 || status == 403 {
+            return true
+        }
+        return false
     }
 
     private func refreshCodexLimits() async {
