@@ -453,6 +453,8 @@ final class CompanionStore {
         if state.active == nil, state.installBaselineSet, !isHatching {
             Task { await ensureEggPrefetch() }
         }
+        awardTimeOpenXP(today: todayDate)
+
         // 알이 부화 임계에 도달하면 부화
         if state.active == nil, state.eggUsage >= PokemonBalance.eggHatchThreshold, !isHatching {
             Task { await hatchIfNeeded() }
@@ -816,6 +818,45 @@ final class CompanionStore {
     /// 한도 창 상태로부터 사탕 지급(엣지·영속). AppDelegate 가 매 refresh 완료 시(한도 로드 후) 호출.
     /// - 첫 실행: 현재 100% 창을 지급 없이 tier 시드만 → 이후 "새로 넘어서는" 순간부터 지급(소급 차단).
     /// - limitsReady=false(한도 미로딩)면 시드/지급 모두 대기(다음 refresh 에 재시도).
+    
+    /// Passive open-time XP. Toggle lives in UserDefaults (`timeOpenXPEnabled`).
+    /// Does not bump `usedSinceInstall` (shop/real-usage stats stay usage-only).
+    func awardTimeOpenXP(today: String, enabled: Bool? = nil) {
+        let on = enabled ?? (UserDefaults.standard.object(forKey: "timeOpenXPEnabled") as? Bool ?? true)
+        guard on else {
+            if state.lastTimeOpenAwardAt != nil {
+                state.lastTimeOpenAwardAt = nil
+                // Persist clear so re-enable seeds cleanly without a sleep-gap dump.
+                save()
+            }
+            return
+        }
+        let now = clock()
+        let credit = TimeOpenXP.credit(
+            now: now,
+            day: today,
+            lastAwardAt: state.lastTimeOpenAwardAt,
+            awardDay: state.timeOpenAwardDay,
+            awardedToday: state.timeOpenAwardedToday)
+        state.lastTimeOpenAwardAt = credit.awardedAt
+        state.timeOpenAwardDay = credit.day
+        state.timeOpenAwardedToday = credit.awardedToday
+        if credit.xp > 0 {
+            applyProgressXP(credit.xp)
+        }
+    }
+
+    /// Growth-only XP (egg incubation or active stage). Skips `usedSinceInstall`.
+    func applyProgressXP(_ delta: Int) {
+        guard delta > 0 else { return }
+        if state.active == nil {
+            state.eggUsage += delta
+        } else {
+            applyUsage(delta)
+        }
+    }
+
+
     func grantCandies(from windows: [CandyWindow], limitsReady: Bool) {
         guard limitsReady else { return }
         if !state.candyFeatureSeeded {

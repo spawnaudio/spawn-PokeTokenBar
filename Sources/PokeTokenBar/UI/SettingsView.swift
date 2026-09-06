@@ -295,6 +295,16 @@ struct SettingsView: View {
             Divider()
             groupRow {
                 VStack(alignment: .leading, spacing: 1) {
+                    Text(l.timeOpenXPLabel)
+                    Text(l.timeOpenXPHint).font(.caption2).foregroundStyle(.tertiary)
+                }
+                Spacer()
+                Toggle("", isOn: $store.timeOpenXPEnabled)
+                    .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            }
+            Divider()
+            groupRow {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(l.statusChecksLabel)
                     Text(l.statusChecksHint).font(.caption2).foregroundStyle(.tertiary)
                 }

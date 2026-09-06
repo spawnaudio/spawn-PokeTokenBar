@@ -115,6 +115,10 @@ final class UsageStore {
     var companionNotifications: Bool {
         didSet { defaults.set(companionNotifications, forKey: "companionNotifications") }
     }
+    /// Award companion XP while the app is open (refresh-driven). Default on.
+    var timeOpenXPEnabled: Bool {
+        didSet { defaults.set(timeOpenXPEnabled, forKey: "timeOpenXPEnabled") }
+    }
     /// 새 버전 알림(팝오버 업데이트 배너) 표시 여부 — 기본 켬. 끄면 배너 숨김(수동 확인은 설정에서 가능).
     var updateNotificationsEnabled: Bool {
         didSet { defaults.set(updateNotificationsEnabled, forKey: "updateNotificationsEnabled") }
@@ -525,6 +529,7 @@ final class UsageStore {
         limitDisplayMode = LimitDisplayMode(rawValue: d.string(forKey: "limitDisplayMode") ?? "") ?? .used
         limitNotifications = d.object(forKey: "limitNotifications") as? Bool ?? true
         companionNotifications = d.object(forKey: "companionNotifications") as? Bool ?? true
+        timeOpenXPEnabled = d.object(forKey: "timeOpenXPEnabled") as? Bool ?? true
         updateNotificationsEnabled = d.object(forKey: "updateNotificationsEnabled") as? Bool ?? true
         statusChecksEnabled = d.object(forKey: "statusChecksEnabled") as? Bool ?? true
         floatingPetEnabled = d.object(forKey: "floatingPetEnabled") as? Bool ?? false

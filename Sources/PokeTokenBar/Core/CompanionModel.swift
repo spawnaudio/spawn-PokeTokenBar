@@ -570,6 +570,11 @@ struct CompanionState: Codable, Sendable {
     var candyGrantTier: [String: Int] = [:]
     // 사탕 지급 첫 실행 시드 완료 — 업데이트 직후 이미 100%였던 창의 소급 지급 차단.
     var candyFeatureSeeded = false
+    // Time-open XP ledger (device-local). Credits open time into egg/active growth without
+    // touching usedSinceInstall. Cleared/rebased on save import for this Mac.
+    var lastTimeOpenAwardAt: Date? = nil
+    var timeOpenAwardDay = ""
+    var timeOpenAwardedToday = 0
 
     init() {}
 
@@ -605,6 +610,9 @@ struct CompanionState: Codable, Sendable {
         inventory          = c.lenient([String: Int].self, forKey: .inventory, default: [:])
         candyGrantTier     = c.lenient([String: Int].self, forKey: .candyGrantTier, default: [:])
         candyFeatureSeeded = c.lenient(Bool.self, forKey: .candyFeatureSeeded, default: false)
+        lastTimeOpenAwardAt = c.lenientOptional(Date.self, forKey: .lastTimeOpenAwardAt)
+        timeOpenAwardDay = c.lenient(String.self, forKey: .timeOpenAwardDay, default: "")
+        timeOpenAwardedToday = c.lenient(Int.self, forKey: .timeOpenAwardedToday, default: 0)
     }
 
     /// 졸업 기록 또는 현재 개체가 실제로 도달한 단계에 이 종이 포함되는가.

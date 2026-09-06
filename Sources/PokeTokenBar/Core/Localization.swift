@@ -278,6 +278,17 @@ struct L {
 
     var limitNotificationsLabel: String { t("한도 알림", "Limit alerts", "上限通知", "Alertas de límite", "Alertes de limite", "Alertas de limite", "Limit-Warnungen") }
     var companionNotificationsLabel: String { t("Companion 이벤트 (부화·진화·졸업)", "Companion events (hatch / evolve / graduate)", "コンパニオンイベント（孵化・進化・卒業）", "Eventos del compañero (eclosión / evolución / graduación)", "Événements du compagnon (éclosion / évolution / diplôme)", "Eventos do companheiro (nascimento / evolução / formatura)", "Begleiter-Ereignisse (Schlüpfen / Entwicklung / Abschied)") }
+    var timeOpenXPLabel: String { t("실행 시간 XP", "Time-open XP", "起動時間XP", "XP por tiempo abierto", "XP au fil du temps", "XP por tempo aberto", "XP für offene Zeit") }
+    var timeOpenXPHint: String {
+        t("앱이 열려 있는 동안 포켓몬이 천천히 성장합니다(하루 상한 있음). 토큰 통계에는 포함되지 않습니다.",
+          "Your Pokémon grows slowly while the app is open (daily cap). Does not count toward token stats.",
+          "アプリ起動中はポケモンがゆっくり成長します（日次上限あり）。トークン統計には含まれません。",
+          "Tu Pokémon crece despacio mientras la app está abierta (límite diario). No cuenta en las estadísticas de tokens.",
+          "Ton Pokémon grandit lentement tant que l’app est ouverte (plafond quotidien). Ne compte pas dans les stats de tokens.",
+          "Seu Pokémon cresce devagar enquanto o app está aberto (limite diário). Não conta nas estatísticas de tokens.",
+          "Dein Pokémon wächst langsam, solange die App offen ist (Tageslimit). Zählt nicht in die Token-Statistik.")
+    }
+
     var statusChecksLabel: String { t("프로바이더 상태 확인", "Provider status checks", "プロバイダー状態チェック", "Comprobación de estado de proveedores", "Vérification de l'état des fournisseurs", "Verificação de status dos provedores", "Anbieterstatus prüfen") }
     var statusChecksHint: String { t("Claude·OpenAI 장애를 팝오버에 표시 (알림 아님)", "Show Claude / OpenAI incidents in the popover (not a notification)", "Claude・OpenAIの障害をポップオーバーに表示（通知ではない）", "Muestra incidentes de Claude/OpenAI en el popover (no es una notificación)", "Affiche les incidents Claude / OpenAI dans le popover (pas une notification)", "Mostra incidentes do Claude/OpenAI no painel (não é uma notificação)", "Störungen bei Claude / OpenAI im Popover anzeigen (keine Benachrichtigung)") }
     var warning: String { t("경고", "Warning", "警告", "Aviso", "Avertissement", "Aviso", "Warnung") }
