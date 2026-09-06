@@ -115,6 +115,14 @@ final class UsageStore {
     var companionNotifications: Bool {
         didSet { defaults.set(companionNotifications, forKey: "companionNotifications") }
     }
+    /// Award companion XP while the app is open (refresh-driven). Default on.
+    var timeOpenXPEnabled: Bool {
+        didSet { defaults.set(timeOpenXPEnabled, forKey: "timeOpenXPEnabled") }
+    }
+    /// Poll Linear for completed issues and award companion XP. Default off (needs API key).
+    var linearIntegrationEnabled: Bool {
+        didSet { defaults.set(linearIntegrationEnabled, forKey: "linearIntegrationEnabled") }
+    }
     /// 새 버전 알림(팝오버 업데이트 배너) 표시 여부 — 기본 켬. 끄면 배너 숨김(수동 확인은 설정에서 가능).
     var updateNotificationsEnabled: Bool {
         didSet { defaults.set(updateNotificationsEnabled, forKey: "updateNotificationsEnabled") }
@@ -525,6 +533,9 @@ final class UsageStore {
         limitDisplayMode = LimitDisplayMode(rawValue: d.string(forKey: "limitDisplayMode") ?? "") ?? .used
         limitNotifications = d.object(forKey: "limitNotifications") as? Bool ?? true
         companionNotifications = d.object(forKey: "companionNotifications") as? Bool ?? true
+        timeOpenXPEnabled = d.object(forKey: "timeOpenXPEnabled") as? Bool ?? true
+        linearIntegrationEnabled = d.object(forKey: "linearIntegrationEnabled") as? Bool ?? false
+        linearAPIKeyConfigured = linearAPIKeys.load() != nil
         updateNotificationsEnabled = d.object(forKey: "updateNotificationsEnabled") as? Bool ?? true
         statusChecksEnabled = d.object(forKey: "statusChecksEnabled") as? Bool ?? true
         floatingPetEnabled = d.object(forKey: "floatingPetEnabled") as? Bool ?? false
@@ -821,6 +832,12 @@ final class UsageStore {
 
     /// 키가 저장돼 있는지. 저장 여부만 노출하고 값은 UI 로 되돌리지 않는다.
     var sessionKeyConfigured = false
+    var linearAPIKeyConfigured = false
+    var linearAPIKeyError: String?
+    var isValidatingLinearAPIKey = false
+    private let linearAPIKeys = LinearAPIKeyStore()
+    private var linearClient = LinearClient()
+
     /// 저장된 키가 만료로 거부된 상태. `sessionKeyConfigured` 는 키가 죽어도 true 라(지우는 건
     /// 사용자 몫) 그것만으로 배지를 그리면 만료 후에도 "설정됨"이 남는다 — 설정에 들어온 사용자가
     /// 무엇을 해야 하는지 알 수 없던 지점이다.
@@ -885,6 +902,46 @@ final class UsageStore {
     }
 
     /// 조직 수동 교체 — 자동 선택이 회사/개인 계정을 잘못 고른 경우.
+
+    func saveLinearAPIKey(_ raw: String) async {
+        guard !isValidatingLinearAPIKey else { return }
+        isValidatingLinearAPIKey = true
+        linearAPIKeyError = nil
+        defer { isValidatingLinearAPIKey = false }
+        do {
+            let key = try LinearAPIKeyStore.normalize(raw)
+            // Probe with a short lookback so typos fail fast.
+            _ = try await linearClient.fetchCompletedIssues(
+                apiKey: key, since: Date().addingTimeInterval(-86_400))
+            try linearAPIKeys.save(.init(key: key))
+            linearAPIKeyConfigured = true
+        } catch LinearAPIError.malformedKey {
+            linearAPIKeyError = "malformed"
+        } catch {
+            linearAPIKeyError = "invalid"
+        }
+    }
+
+    func clearLinearAPIKey() {
+        linearAPIKeys.clear()
+        linearAPIKeyConfigured = false
+        linearAPIKeyError = nil
+    }
+
+    /// Fetch + return completions when integration is on and a key is stored.
+    func fetchLinearCompletionsForCompanion() async -> [LinearCompletedIssue] {
+        guard linearIntegrationEnabled,
+              let key = linearAPIKeys.load()?.key else { return [] }
+        let since = Calendar.current.date(
+            byAdding: .day, value: -LinearRewards.lookbackDays, to: Date()) ?? Date()
+        do {
+            return try await linearClient.fetchCompletedIssues(apiKey: key, since: since)
+        } catch {
+            return []
+        }
+    }
+
+
     func selectSessionOrganization(_ id: String) async {
         guard let credential = sessionKeys.credential(), credential.organizationID != id else { return }
         do {

@@ -278,6 +278,32 @@ struct L {
 
     var limitNotificationsLabel: String { t("한도 알림", "Limit alerts", "上限通知", "Alertas de límite", "Alertes de limite", "Alertas de limite", "Limit-Warnungen") }
     var companionNotificationsLabel: String { t("Companion 이벤트 (부화·진화·졸업)", "Companion events (hatch / evolve / graduate)", "コンパニオンイベント（孵化・進化・卒業）", "Eventos del compañero (eclosión / evolución / graduación)", "Événements du compagnon (éclosion / évolution / diplôme)", "Eventos do companheiro (nascimento / evolução / formatura)", "Begleiter-Ereignisse (Schlüpfen / Entwicklung / Abschied)") }
+    var timeOpenXPLabel: String { t("실행 시간 XP", "Time-open XP", "起動時間XP", "XP por tiempo abierto", "XP au fil du temps", "XP por tempo aberto", "XP für offene Zeit") }
+    var timeOpenXPHint: String {
+        t("앱이 열려 있는 동안 포켓몬이 천천히 성장합니다(하루 상한 있음). 토큰 통계에는 포함되지 않습니다.",
+          "Your Pokémon grows slowly while the app is open (daily cap). Does not count toward token stats.",
+          "アプリ起動中はポケモンがゆっくり成長します（日次上限あり）。トークン統計には含まれません。",
+          "Tu Pokémon crece despacio mientras la app está abierta (límite diario). No cuenta en las estadísticas de tokens.",
+          "Ton Pokémon grandit lentement tant que l’app est ouverte (plafond quotidien). Ne compte pas dans les stats de tokens.",
+          "Seu Pokémon cresce devagar enquanto o app está aberto (limite diário). Não conta nas estatísticas de tokens.",
+          "Dein Pokémon wächst langsam, solange die App offen ist (Tageslimit). Zählt nicht in die Token-Statistik.")
+    }
+
+    var linearIntegrationLabel: String { t("Linear 완료 XP", "Linear completion XP", "Linear完了XP", "XP por completar en Linear", "XP de complétion Linear", "XP por conclusão no Linear", "Linear-Abschluss-XP") }
+    var linearIntegrationHint: String {
+        t("Linear에서 이슈를 완료하면 포켓몬이 성장합니다. Personal API Key가 필요하며 Application Support에 평문으로 저장됩니다.",
+          "Completing Linear issues grows your Pokémon. Needs a personal API key (stored in plaintext under Application Support).",
+          "Linearで課題を完了するとポケモンが成長します。Personal API Keyが必要で、Application Supportに平文保存されます。",
+          "Completar issues en Linear hace crecer a tu Pokémon. Necesita una API key personal (texto plano en Application Support).",
+          "Terminer des issues Linear fait grandir ton Pokémon. Nécessite une clé API personnelle (texte brut dans Application Support).",
+          "Concluir issues no Linear faz seu Pokémon crescer. Precisa de uma API key pessoal (texto puro em Application Support).",
+          "Erledigte Linear-Issues lassen dein Pokémon wachsen. Persönlicher API-Key nötig (Klartext unter Application Support).")
+    }
+    var linearAPIKeyLabel: String { t("Linear API 키", "Linear API key", "Linear APIキー", "Clave API de Linear", "Clé API Linear", "Chave de API do Linear", "Linear-API-Schlüssel") }
+    var linearAPIKeySaved: String { t("설정됨", "Saved", "設定済み", "Guardada", "Enregistrée", "Salva", "Gespeichert") }
+    var linearAPIKeyMalformed: String { t("키 형식이 아닙니다 (lin_api_ 로 시작).", "That isn’t an API key (should start with lin_api_).", "キー形式ではありません（lin_api_ で開始）。", "Eso no es una clave API (debe empezar por lin_api_).", "Ce n’est pas une clé API (doit commencer par lin_api_).", "Isso não é uma chave de API (deve começar com lin_api_).", "Das ist kein API-Schlüssel (sollte mit lin_api_ beginnen).") }
+    var linearAPIKeyInvalid: String { t("Linear가 키를 거부했습니다. 권한을 확인하세요.", "Linear rejected that key. Check its permissions.", "Linearがキーを拒否しました。権限を確認してください。", "Linear rechazó esa clave. Revisa sus permisos.", "Linear a rejeté cette clé. Vérifie ses permissions.", "O Linear rejeitou essa chave. Verifique as permissões.", "Linear hat diesen Schlüssel abgelehnt. Berechtigungen prüfen.") }
+
     var statusChecksLabel: String { t("프로바이더 상태 확인", "Provider status checks", "プロバイダー状態チェック", "Comprobación de estado de proveedores", "Vérification de l'état des fournisseurs", "Verificação de status dos provedores", "Anbieterstatus prüfen") }
     var statusChecksHint: String { t("Claude·OpenAI 장애를 팝오버에 표시 (알림 아님)", "Show Claude / OpenAI incidents in the popover (not a notification)", "Claude・OpenAIの障害をポップオーバーに表示（通知ではない）", "Muestra incidentes de Claude/OpenAI en el popover (no es una notificación)", "Affiche les incidents Claude / OpenAI dans le popover (pas une notification)", "Mostra incidentes do Claude/OpenAI no painel (não é uma notificação)", "Störungen bei Claude / OpenAI im Popover anzeigen (keine Benachrichtigung)") }
     var warning: String { t("경고", "Warning", "警告", "Aviso", "Avertissement", "Aviso", "Warnung") }

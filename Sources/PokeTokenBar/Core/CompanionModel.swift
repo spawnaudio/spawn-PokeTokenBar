@@ -171,15 +171,18 @@ enum ItemKind: String, Codable, Sendable, CaseIterable {
 
 /// 이상한 사탕 밸런스 상수.
 enum RareCandy {
-    /// 사용 시 현재 포켓몬에 주입하는 XP(토큰 환산). 최소 진화 임계(커먼 3형태 1단계, 스케일 후)보다 작아
-    /// 사탕 1개는 최대 1단계만 올린다(연쇄·졸업 폭주 없음). applyUsage 로 주입 → 이월/진화/졸업 자동.
-    static let xp = EconomyScale.tokens(100_000_000)
+    /// 사용 시 현재 포켓몬에 주입하는 XP(토큰 환산). Upstream 2.5M → 스케일 후 스낵 크기.
+    /// 최소 진화 임계(커먼 3형태 1단계)보다 작아 사탕 1개는 최대 1단계만 올린다(연쇄·졸업 폭주 없음)
+    /// — 임계 직전에서만 진화를 넘긴다. applyUsage 로 주입 → 이월/진화/졸업 자동.
+    /// (구버전 upstream 100M 은 "거의 1단계"에 가까워 상시 진화 압력이 커서 2.5M 스낵으로 낮춤 —
+    /// Linear 완료 보상·타임오픈 XP 와 같은 체급.)
+    static let xp = EconomyScale.tokens(2_500_000)
     /// 주간 한도 100% 도달 시 지급 개수(세션급은 1개).
     static let weeklyGrant = 5
-    /// 상점 구매가(재화 = 사용한 토큰: usedSinceInstall − spentTokens). XP 값어치의 5배.
+    /// 상점 구매가(재화 = 사용한 토큰: usedSinceInstall − spentTokens).
     /// 토큰이 "성장 미터 + 상점 지갑"으로 이중 사용되는 구조라, 가격을 XP 와 같게 두면 구매가 사실상
-    /// 공짜 추가성장이 된다. 가격을 XP 의 5배로 두면 그 값 모으는 패시브 성장 + 사탕 XP = 실질 보너스
-    /// +20% 로 억제된다. 무료 획득(한도 100% 보상)이 항상 이득이도록 값어치보다 비싸게.
+    /// 공짜 추가성장이 된다. Upstream 500M(스케일 후 XP 대비 훨씬 큼) — 상점 사탕은 편의 소비,
+    /// 무료 획득(한도 100% 보상)이 항상 이득.
     static let price = EconomyScale.tokens(500_000_000)
 }
 
@@ -570,6 +573,15 @@ struct CompanionState: Codable, Sendable {
     var candyGrantTier: [String: Int] = [:]
     // 사탕 지급 첫 실행 시드 완료 — 업데이트 직후 이미 100%였던 창의 소급 지급 차단.
     var candyFeatureSeeded = false
+    // Time-open XP ledger (device-local). Credits open time into egg/active growth without
+    // touching usedSinceInstall. Cleared/rebased on save import for this Mac.
+    var lastTimeOpenAwardAt: Date? = nil
+    var timeOpenAwardDay = ""
+    var timeOpenAwardedToday = 0
+    /// Linear issue IDs already credited (account ledger — merge on save import).
+    var linearCreditedIssueIDs: [String] = []
+    /// First successful Linear poll seeds IDs without XP (no backfill dump).
+    var linearIntegrationSeeded = false
 
     init() {}
 
@@ -605,6 +617,11 @@ struct CompanionState: Codable, Sendable {
         inventory          = c.lenient([String: Int].self, forKey: .inventory, default: [:])
         candyGrantTier     = c.lenient([String: Int].self, forKey: .candyGrantTier, default: [:])
         candyFeatureSeeded = c.lenient(Bool.self, forKey: .candyFeatureSeeded, default: false)
+        lastTimeOpenAwardAt = c.lenientOptional(Date.self, forKey: .lastTimeOpenAwardAt)
+        timeOpenAwardDay = c.lenient(String.self, forKey: .timeOpenAwardDay, default: "")
+        timeOpenAwardedToday = c.lenient(Int.self, forKey: .timeOpenAwardedToday, default: 0)
+        linearCreditedIssueIDs = c.lenient([String].self, forKey: .linearCreditedIssueIDs, default: [])
+        linearIntegrationSeeded = c.lenient(Bool.self, forKey: .linearIntegrationSeeded, default: false)
     }
 
     /// 졸업 기록 또는 현재 개체가 실제로 도달한 단계에 이 종이 포함되는가.

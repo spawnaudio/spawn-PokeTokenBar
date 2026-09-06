@@ -348,13 +348,19 @@ final class RareCandyStoreTests: XCTestCase {
     func testSequentialCandyUseMatchesDemo() async {
         let s = store(rcLinear3)
         await s.hatch(baseID: 1)
-        s.applyUsage(RareCandy.xp)                      // stage0 도달 전
+        // Snack-sized candy XP (scaled 2.5M upstream) needs threshold-relative setup —
+        // applyUsage(RareCandy.xp) alone no longer reaches stage0 under EconomyScale.
+        let stage0 = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
+        let stage1 = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 1)
+        s.applyUsage(stage0 - RareCandy.xp)             // stage0 임계 직전
         giveCandies(s, 3)
-        XCTAssertEqual(s.useRareCandy(), .evolved)
+        XCTAssertEqual(s.useRareCandy(), .evolved)     // 임계 돌파 → stage1
         XCTAssertEqual(s.state.active?.stageIndex, 1)
-        XCTAssertEqual(s.useRareCandy(), .progressed)
+        XCTAssertEqual(s.useRareCandy(), .progressed)  // snack << stage1 → 부분성장
         XCTAssertEqual(s.state.active?.stageIndex, 1)
-        XCTAssertEqual(s.useRareCandy(), .evolved)
+        let used = s.state.active!.usedAtStage
+        s.applyUsage(stage1 - used - RareCandy.xp)     // stage1 임계 직전
+        XCTAssertEqual(s.useRareCandy(), .evolved)     // 임계 돌파 → stage2
         XCTAssertEqual(s.state.active?.stageIndex, 2)
         XCTAssertEqual(s.rareCandyCount, 0)
     }

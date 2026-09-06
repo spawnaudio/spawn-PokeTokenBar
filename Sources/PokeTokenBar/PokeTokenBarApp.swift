@@ -238,6 +238,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func onStoreRefreshed() {
         updateCompanion()
         companion.grantCandies(from: store.candyEligibleWindows, limitsReady: store.limitsReady)
+        guard store.linearIntegrationEnabled else { return }
+        Task { @MainActor in
+            let issues = await store.fetchLinearCompletionsForCompanion()
+            _ = companion.creditLinearCompletions(issues)
+        }
     }
 
     // MARK: 메뉴바 애니메이션

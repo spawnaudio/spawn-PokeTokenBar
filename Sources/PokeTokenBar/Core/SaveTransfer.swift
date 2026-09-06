@@ -145,6 +145,7 @@ enum SaveTransfer {
         s.usedSinceInstall = clampToken(s.usedSinceInstall)
         s.spentTokens = clampToken(s.spentTokens)
         s.eggUsage = clampToken(s.eggUsage)
+        s.timeOpenAwardedToday = clampToken(s.timeOpenAwardedToday)
         s.claimedTodayTokensByProvider = s.claimedTodayTokensByProvider?.reduce(into: [:]) { result, entry in
             result[entry.key] = clampToken(entry.value)
         }
@@ -195,6 +196,14 @@ enum SaveTransfer {
         state.language = current.language
         state.candyGrantTier = mergedGrantTier(imported.candyGrantTier, current.candyGrantTier)
         state.candyFeatureSeeded = imported.candyFeatureSeeded || current.candyFeatureSeeded
+        state.linearCreditedIssueIDs = LinearRewards.mergedCreditedIDs(
+            imported.linearCreditedIssueIDs, current.linearCreditedIssueIDs)
+        state.linearIntegrationSeeded = imported.linearIntegrationSeeded || current.linearIntegrationSeeded
+        // Time-open XP is a per-device clock ledger — never import another Mac's baseline
+        // or you silently skip hours (or dump a gap) on the first tick after import.
+        state.lastTimeOpenAwardAt = nil
+        state.timeOpenAwardDay = ""
+        state.timeOpenAwardedToday = 0
         let hasCurrentProviderData = hasUsageData && !todayTokensByProvider.isEmpty
         if hasCurrentProviderData {
             // 신규 설치와 같은 규칙: 불러온 시점 이전의 이 기기 사용량은 소급 적립하지 않는다.
