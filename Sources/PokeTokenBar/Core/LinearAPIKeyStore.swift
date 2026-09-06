@@ -58,6 +58,7 @@ struct LinearAPIKeyStore: Sendable {
 
 enum LinearAPIError: Error, Equatable {
     case malformedKey
+    case unauthorized
     case httpStatus(Int)
     case decoding
     case transport

@@ -919,14 +919,23 @@ final class UsageStore {
         defer { isValidatingLinearAPIKey = false }
         do {
             let key = try LinearAPIKeyStore.normalize(raw)
-            // Probe with a short lookback so typos fail fast.
-            _ = try await linearClient.fetchIssueDashboard(
-                apiKey: key, completedSince: Date().addingTimeInterval(-86_400))
+            // Validate auth with a lightweight probe. Non-auth failures (timeouts, transient
+            // API errors) should not block saving a valid key.
+            do {
+                try await linearClient.validateAPIKey(apiKey: key)
+            } catch {
+                if Self.shouldRejectLinearAPIKeyValidation(error) { throw error }
+                AppLog.write("linear key probe inconclusive (saving key): \(error)")
+            }
             try linearAPIKeys.save(.init(key: key))
             linearAPIKeyConfigured = true
             linearIssuesError = nil
         } catch LinearAPIError.malformedKey {
             linearAPIKeyError = "malformed"
+        } catch LinearAPIError.unauthorized {
+            linearAPIKeyError = "invalid"
+        } catch LinearAPIError.httpStatus(let status) where status == 401 || status == 403 {
+            linearAPIKeyError = "invalid"
         } catch {
             linearAPIKeyError = "invalid"
         }
@@ -1101,6 +1110,15 @@ final class UsageStore {
         case .sessionKeyNoOrganization:
             return l.sessionKeyNoOrgError
         }
+    }
+
+    /// True only when a key probe proves the credential is invalid.
+    nonisolated static func shouldRejectLinearAPIKeyValidation(_ error: any Error) -> Bool {
+        if case LinearAPIError.unauthorized = error { return true }
+        if case LinearAPIError.httpStatus(let status) = error, status == 401 || status == 403 {
+            return true
+        }
+        return false
     }
 
     private func refreshCodexLimits() async {

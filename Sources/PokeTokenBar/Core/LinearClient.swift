@@ -71,15 +71,50 @@ struct LinearClient: Sendable {
         }
     }
 
+    /// Lightweight auth probe used by Settings key validation.
+    /// We intentionally avoid the dashboard query here because large workspaces can
+    /// hit transient timeouts/rate limits and look like false "invalid key" failures.
+    func validateAPIKey(apiKey: String) async throws {
+        let query = """
+        query ValidateLinearAPIKey {
+          viewer { id }
+        }
+        """
+        let payload: [String: Any] = ["query": query]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let (status, data): (Int, Data)
+        do {
+            (status, data) = try await http.postGraphQL(apiKey: apiKey, body: body)
+        } catch {
+            throw LinearAPIError.transport
+        }
+        if status == 401 || status == 403 { throw LinearAPIError.unauthorized }
+        guard (200..<300).contains(status) else { throw LinearAPIError.httpStatus(status) }
+
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LinearAPIError.decoding
+        }
+        if let errors = root["errors"] as? [[String: Any]], !errors.isEmpty {
+            if Self.containsUnauthorizedGraphQLError(errors) {
+                throw LinearAPIError.unauthorized
+            }
+            throw LinearAPIError.decoding
+        }
+        guard let dataObj = root["data"] as? [String: Any],
+              let viewer = dataObj["viewer"] as? [String: Any],
+              let viewerID = viewer["id"] as? String,
+              !viewerID.isEmpty
+        else { throw LinearAPIError.decoding }
+    }
+
     /// Fetches issue panel data used by the popover.
     func fetchIssueDashboard(apiKey: String, completedSince: Date) async throws -> LinearIssueDashboard {
         let sinceISO = ISO8601DateFormatter().string(from: completedSince)
         let query = """
-        query IssueDashboard($since: DateTime!) {
+        query IssueDashboard($since: DateTimeOrDuration!) {
           completedRecent: issues(
             filter: { completedAt: { gte: $since } }
             first: 100
-            orderBy: priority
           ) {
             nodes {
               id
@@ -100,7 +135,7 @@ struct LinearClient: Sendable {
               completedAt
             }
           }
-          inProgress: issues(first: 100, orderBy: priority) {
+          inProgress: issues(first: 100) {
             nodes {
               id
               identifier
@@ -225,6 +260,30 @@ struct LinearClient: Sendable {
         dayOnly.timeZone = TimeZone(secondsFromGMT: 0)
         dayOnly.dateFormat = "yyyy-MM-dd"
         return dayOnly.date(from: raw)
+    }
+
+    private static func containsUnauthorizedGraphQLError(_ errors: [[String: Any]]) -> Bool {
+        for error in errors {
+            if let extensions = error["extensions"] as? [String: Any],
+               let code = extensions["code"] as? String {
+                let normalized = code.lowercased()
+                if normalized.contains("auth") || normalized.contains("unauthorized")
+                    || normalized.contains("forbidden")
+                {
+                    return true
+                }
+            }
+            if let message = error["message"] as? String {
+                let normalized = message.lowercased()
+                if normalized.contains("unauthorized") || normalized.contains("forbidden")
+                    || normalized.contains("invalid token") || normalized.contains("invalid api key")
+                    || normalized.contains("authentication") || normalized.contains("auth token")
+                {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     /// Pure parser — unit-tested without network.
