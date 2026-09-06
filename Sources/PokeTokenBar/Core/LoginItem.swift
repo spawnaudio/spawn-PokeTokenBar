@@ -12,8 +12,12 @@ import ServiceManagement
 /// (= 로그인 실행과 크래시-재실행이 한 토글로 묶임 — 메뉴바 앱엔 자연스러운 결합).
 @MainActor
 enum LoginItem {
-    static let plistName = "io.github.chattymin.poketokenbar.login.plist"
-    static let label = "io.github.chattymin.poketokenbar.login"
+    /// Derived from this bundle so a side-by-side build cannot steal the installed app's LaunchAgent.
+    static var plistName: String { "\(bundleID).login.plist" }
+    static var label: String { "\(bundleID).login" }
+    private static var bundleID: String {
+        Bundle.main.bundleIdentifier ?? "io.github.chattymin.poketokenbar"
+    }
     private static var agent: SMAppService { SMAppService.agent(plistName: plistName) }
 
     /// 현재 "로그인 시 실행(+크래시 자동 재실행)" 활성 여부.

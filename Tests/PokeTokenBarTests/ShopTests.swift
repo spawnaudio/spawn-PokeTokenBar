@@ -80,7 +80,7 @@ final class ShopTests: XCTestCase {
 
     /// 잔액 부족이면 no-op — 인벤토리·지출 원장 불변, false 반환.
     func testBuyInsufficientIsNoOp() {
-        let s = store(used: 400_000_000)
+        let s = store(used: RareCandy.price - 1)
         XCTAssertFalse(s.buyRareCandy())
         XCTAssertEqual(s.rareCandyCount, 0)
         XCTAssertEqual(s.state.spentTokens, 0)
@@ -88,13 +88,14 @@ final class ShopTests: XCTestCase {
 
     /// 여러 번 구매하면 잔액이 바닥날 때까지만 성공(가드가 매번 재평가).
     func testMultipleBuysUntilBroke() {
-        let s = store(used: 1_200_000_000)          // 2개까지 가능(1B), 3번째 실패(잔액 200M)
+        let leftover = RareCandy.price / 2
+        let s = store(used: 2 * RareCandy.price + leftover)
         XCTAssertTrue(s.buyRareCandy())
         XCTAssertTrue(s.buyRareCandy())
         XCTAssertFalse(s.buyRareCandy())
         XCTAssertEqual(s.rareCandyCount, 2)
         XCTAssertEqual(s.state.spentTokens, 2 * RareCandy.price)
-        XCTAssertEqual(s.availableTokens, 200_000_000)
+        XCTAssertEqual(s.availableTokens, leftover)
     }
 
     /// 구매는 이미 가진 사탕에 합산된다(무료 지급분과 같은 인벤토리).
@@ -123,7 +124,7 @@ final class ShopTests: XCTestCase {
 
     // MARK: 정렬 (가격 저렴한 순 + 구매 완료 보유형 맨 아래)
 
-    /// 상점 목록은 가격 오름차순(민트 100M < 사탕 500M < 이로치 부적 3B).
+    /// 상점 목록은 가격 오름차순(민트 < 사탕 < 이로치 부적).
     func testItemsSortedByPriceAscending() {
         let items = store(used: 0).purchasableItems
         XCTAssertEqual(items, [.mint, .rareCandy, .shinyCharm])
@@ -159,12 +160,12 @@ final class ShopTests: XCTestCase {
         let s = CompanionStore(provider: ShopNoProvider(), clock: { self.now }, fileURL: url, rng: SeededRNG(seed: 1))
         XCTAssertTrue(s.hasActive)
         XCTAssertEqual(s.shopEntries,
-                       [.item(.mint),        // 100M
-                        .item(.rareCandy),   // 500M
-                        .egg(nil),           // 1B
-                        .egg(.uncommon),     // 2.5B
-                        .item(.shinyCharm),  // 3B
-                        .egg(.rare)])        // 4B
+                       [.item(.mint),
+                        .item(.rareCandy),
+                        .egg(nil),
+                        .egg(.uncommon),
+                        .item(.shinyCharm),
+                        .egg(.rare)])
         let prices = s.shopEntries.map(\.price)
         XCTAssertEqual(prices, prices.sorted(), "가격 상수가 바뀌어도 오름차순 불변식 유지")
     }
