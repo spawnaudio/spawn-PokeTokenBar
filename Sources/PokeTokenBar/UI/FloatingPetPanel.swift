@@ -10,6 +10,8 @@ import SwiftUI
 final class FloatingPetController: NSObject, NSWindowDelegate {
     private let store: UsageStore
     private let companion: CompanionStore
+    private let hub: WorkHub
+    private let timer: FocusTimer
     private let defaults: UserDefaults
     private var panel: NSPanel?
     private var hoverPanel: NSPanel?
@@ -77,10 +79,13 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
     private var onOpenPopover: (() -> Void)?
     private var onHide: (() -> Void)?
 
-    init(store: UsageStore, companion: CompanionStore, defaults: UserDefaults = .standard,
+    init(store: UsageStore, companion: CompanionStore, hub: WorkHub, timer: FocusTimer,
+         defaults: UserDefaults = .standard,
          onOpenPopover: (() -> Void)? = nil, onHide: (() -> Void)? = nil) {
         self.store = store
         self.companion = companion
+        self.hub = hub
+        self.timer = timer
         self.defaults = defaults
         self.onOpenPopover = onOpenPopover
         self.onHide = onHide
@@ -110,6 +115,8 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
             _ = store.highestLimitUtilization
             _ = store.limitDisplayMode   // hover 툴팁 %가 파생되는 값 — 수동 관찰 표면은 파생 원천을 직접 추적(defect-log §표시·UI)
             _ = companion.language
+            _ = timer.remaining
+            _ = timer.isRunning
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -210,10 +217,24 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
         let wantAnimated = Self.shouldAnimate(lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
         if p.contentView == nil || builtAnimated != wantAnimated {
             let hosting = PetHostingView(rootView: AnyView(
-                FloatingPetView(animated: wantAnimated).environment(store).environment(companion)))
+                FloatingPetView(animated: wantAnimated)
+                    .environment(store).environment(companion).environment(timer)))
             hosting.onOpenPopover = onOpenPopover
             hosting.onHide = onHide
             hosting.languageProvider = { [weak self] in self?.companion.language ?? .systemDefault }
+            hosting.assignableItems = { [weak self] in
+                guard let self else { return [] }
+                return self.hub.inbox(status: .inProgress) + self.hub.inbox(status: .todo)
+            }
+            hosting.onAssignItem = { [weak self] item in
+                self?.timer.assign(item)
+                self?.timer.start()
+            }
+            hosting.onCompleteAssigned = { [weak self] in
+                guard let self, let id = self.timer.assignedItemID,
+                      let item = self.hub.items.first(where: { $0.id == id }) else { return }
+                Task { await self.hub.complete(item, companion: self.companion) }
+            }
             hosting.onHoverChange = { [weak self] hovering in
                 if hovering { self?.showHoverCallout() } else { self?.hideHoverCallout() }
             }
@@ -305,7 +326,11 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
     }
 
     private func targetFrame(petSize: CGFloat, showingBubble: Bool) -> NSRect {
-        let size = Self.panelSize(petSize: petSize, showingBubble: showingBubble)
+        var size = Self.panelSize(petSize: petSize, showingBubble: showingBubble)
+        if timer.remainingText != nil {
+            size.height += 28
+            size.width = max(size.width, petSize + 16)
+        }
         let petOrigin: NSPoint
         if let x = defaults.object(forKey: Self.originXKey) as? Double,
            let y = defaults.object(forKey: Self.originYKey) as? Double {
@@ -362,6 +387,9 @@ final class PetHostingView: NSHostingView<AnyView> {
     var onHide: (() -> Void)?
     var onHoverChange: ((Bool) -> Void)?
     var languageProvider: () -> AppLanguage = { .systemDefault }
+    var assignableItems: () -> [WorkItem] = { [] }
+    var onAssignItem: ((WorkItem) -> Void)?
+    var onCompleteAssigned: (() -> Void)?
 
     private var mouseDownScreen: NSPoint?
     private var originAtDown: NSPoint?
@@ -431,15 +459,65 @@ final class PetHostingView: NSHostingView<AnyView> {
                                 action: #selector(handleOpen(_:)), keyEquivalent: "")
         open.target = self
         open.isEnabled = true
+        let window = menu.addItem(withTitle: l.openMainWindow,
+                                  action: #selector(handleOpenWindow(_:)), keyEquivalent: "")
+        window.target = self
+        window.isEnabled = true
         let hide = menu.addItem(withTitle: l.floatingPetMenuHide,
                                 action: #selector(handleHide(_:)), keyEquivalent: "")
         hide.target = self
         hide.isEnabled = true
+        menu.addItem(.separator())
+        let assign = NSMenu(title: l.timerAssign)
+        for item in assignableItems().prefix(12) {
+            let row = assign.addItem(withTitle: item.title, action: #selector(handleAssignItem(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = item.id.uuidString
+            row.isEnabled = true
+        }
+        if assign.items.isEmpty {
+            let empty = assign.addItem(withTitle: l.inboxEmpty, action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+        }
+        let assignRoot = menu.addItem(withTitle: l.timerAssign, action: nil, keyEquivalent: "")
+        menu.setSubmenu(assign, for: assignRoot)
+        let pause = menu.addItem(withTitle: l.timerPause,
+                                 action: #selector(handleTimerPause(_:)), keyEquivalent: "")
+        pause.target = self
+        let start = menu.addItem(withTitle: l.timerStart,
+                                 action: #selector(handleTimerStart(_:)), keyEquivalent: "")
+        start.target = self
+        let done = menu.addItem(withTitle: l.markDone,
+                                action: #selector(handleTimerComplete(_:)), keyEquivalent: "")
+        done.target = self
+        let clear = menu.addItem(withTitle: l.timerClear,
+                                 action: #selector(handleTimerClear(_:)), keyEquivalent: "")
+        clear.target = self
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 
     @objc func handleOpen(_ sender: Any?) { onOpenPopover?() }
+    @objc func handleOpenWindow(_ sender: Any?) {
+        NotificationCenter.default.post(name: .ptbOpenMainWindow, object: nil)
+    }
     @objc func handleHide(_ sender: Any?) { onHide?() }
+    @objc func handleTimerPause(_ sender: Any?) {
+        NotificationCenter.default.post(name: .ptbTimerPause, object: nil)
+    }
+    @objc func handleTimerStart(_ sender: Any?) {
+        NotificationCenter.default.post(name: .ptbTimerStart, object: nil)
+    }
+    @objc func handleTimerClear(_ sender: Any?) {
+        NotificationCenter.default.post(name: .ptbTimerClear, object: nil)
+    }
+    @objc func handleTimerComplete(_ sender: Any?) { onCompleteAssigned?() }
+    @objc func handleAssignItem(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let id = UUID(uuidString: raw),
+              let item = assignableItems().first(where: { $0.id == id })
+        else { return }
+        onAssignItem?(item)
+    }
 }
 
 @MainActor
@@ -447,6 +525,7 @@ struct FloatingPetView: View {
     var animated: Bool = true
     @Environment(UsageStore.self) private var store
     @Environment(CompanionStore.self) private var companion
+    @Environment(FocusTimer.self) private var timer
 
     var body: some View {
         let size = CGFloat(store.floatingPetSize)
@@ -458,11 +537,29 @@ struct FloatingPetView: View {
                     .zIndex(1)
             }
 
-            SpriteView(speciesID: subject.speciesID, size: size, animated: animated,
-                       shiny: subject.isShiny,
-                       minFrameDelay: store.animationQuality.frameFloor)
-                .frame(width: size, height: size)
-                .zIndex(0)
+            ZStack {
+                if timer.assignedItemID != nil {
+                    Circle()
+                        .trim(from: 0, to: timer.progress)
+                        .stroke(Color.orange, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: size + 10, height: size + 10)
+                }
+                SpriteView(speciesID: subject.speciesID, size: size, animated: animated,
+                           shiny: subject.isShiny,
+                           minFrameDelay: store.animationQuality.frameFloor)
+                    .frame(width: size, height: size)
+            }
+            .zIndex(0)
+            if let text = timer.remainingText {
+                Text(text)
+                    .font(.system(size: 10, weight: .bold).monospacedDigit())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+            }
+            RewardToastView(companion: companion)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .animation(animated ? .spring(response: 0.3, dampingFraction: 0.7) : nil,

@@ -202,8 +202,9 @@ final class SaveTransferTests: XCTestCase {
         let before = s.state.usedSinceInstall
         s.update(todayTokensByProvider: ["test": newMacTodayLater], todayDate: today, monthTotal: 0,
                  burnTier: .idle, limitWarning: false, hasUsageData: true)
-        XCTAssertEqual(s.state.usedSinceInstall - before, newMacTodayLater - newMacTodaySoFar,
-                       "이전 당일에도 새 Mac 에서 쓴 증분이 적립돼야 한다")
+        XCTAssertEqual(s.state.usedSinceInstall, before,
+                       "token usage no longer funds growth; shop uses coins")
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], newMacTodayLater)
     }
 
     /// 불러올 때 이 기기의 오늘 사용량을 아직 모르면(파싱 전·프로바이더 없음) baseline 판정을
@@ -228,7 +229,8 @@ final class SaveTransferTests: XCTestCase {
         // 그 다음부터는 정상 적립.
         s.update(todayTokensByProvider: ["test": 41_000_000], todayDate: today, monthTotal: 0,
                  burnTier: .idle, limitWarning: false, hasUsageData: true)
-        XCTAssertEqual(s.state.usedSinceInstall - before, 1_000_000)
+        XCTAssertEqual(s.state.usedSinceInstall, before, "token usage no longer funds growth")
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 41_000_000)
     }
 
     /// [회귀] stale snapshot만 남아 `hasUsageData`는 true인데 오늘 map은 비어 있는 상태로
@@ -258,8 +260,9 @@ final class SaveTransferTests: XCTestCase {
 
         s.update(todayTokensByProvider: ["test": 41_000_000], todayDate: today, monthTotal: 0,
                  burnTier: .idle, limitWarning: false, hasUsageData: true)
-        XCTAssertEqual(s.state.usedSinceInstall - before, 1_000_000,
-                       "빈 ledger로 import해도 이후 증가분은 정상 적립돼야 한다")
+        XCTAssertEqual(s.state.usedSinceInstall, before,
+                       "token usage no longer funds growth")
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 41_000_000)
     }
 
     // MARK: 진행 보존 · 가드레일
@@ -514,11 +517,12 @@ final class SaveTransferTests: XCTestCase {
         // eggTier(알 등급 보증) = 진행 — 산 물건이지 이 기기의 장부가 아니라 기기를 옮겨도 따라간다.
         let progress: Set<String> = ["usedSinceInstall", "spentTokens", "eggUsage", "eggTier",
                                      "pendingHatchID", "active", "representativeSpeciesID", "dex",
-                                     "collectedFinals", "inventory"]
+                                     "collectedFinals", "inventory", "coinsEarned", "coinsSpent"]
         let deviceLedger: Set<String> = ["installBaselineSet", "claimedTodayTokensByProvider", "lastDate",
                                      "lastTimeOpenAwardAt", "timeOpenAwardDay", "timeOpenAwardedToday"]
         let accountLedger: Set<String> = ["candyGrantTier", "candyFeatureSeeded",
-                                      "linearCreditedIssueIDs", "linearIntegrationSeeded"]
+                                      "linearCreditedIssueIDs", "linearIntegrationSeeded",
+                                      "creditedWorkKeys", "workLedgerSeeded"]
         let devicePreference: Set<String> = ["language"]
 
         let classified = progress.union(deviceLedger).union(accountLedger).union(devicePreference)

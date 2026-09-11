@@ -8,7 +8,11 @@ let package = Package(
         .executableTarget(
             name: "PokeTokenBar",
             path: "Sources/PokeTokenBar",
-            linkerSettings: [.linkedLibrary("sqlite3")]
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+                .linkedFramework("EventKit"),
+                .linkedFramework("AuthenticationServices"),
+            ]
         ),
         .testTarget(
             name: "PokeTokenBarTests",

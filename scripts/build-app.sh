@@ -39,6 +39,25 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSRemindersUsageDescription</key>
+    <string>PokeTokenBar reads and completes reminders you choose to sync.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>PokeTokenBar reads and completes reminders you choose to sync.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>PokeTokenBar shows today's calendar events so you can mark work blocks done.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>PokeTokenBar shows today's calendar events so you can mark work blocks done.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>$BUNDLE_ID.oauth</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>poketokenbar</string>
+        </array>
+      </dict>
+    </array>
 </dict>
 </plist>
 PLIST

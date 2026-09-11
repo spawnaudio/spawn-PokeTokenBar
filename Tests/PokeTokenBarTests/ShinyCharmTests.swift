@@ -21,7 +21,7 @@ final class ShinyCharmTests: XCTestCase {
     private func store(used: Int = 5_000_000_000, spent: Int = 0, charm: Bool = false, seed: UInt64 = 7) -> CompanionStore {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("charm-\(UUID().uuidString).json")
         let inv = charm ? ",\"inventory\":{\"shinyCharm\":1}" : ""
-        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":\(used),\"spentTokens\":\(spent),"
+        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":0,\"coinsEarned\":\(used),\"coinsSpent\":\(spent),"
             + "\"lastDate\":\"d\",\"active\":null,\"dex\":[],\"collectedFinals\":[]\(inv)}"
         try? json.data(using: .utf8)!.write(to: url)
         return CompanionStore(provider: CharmStubProvider(), clock: { self.now }, fileURL: url, rng: SeededRNG(seed: seed))
@@ -47,7 +47,7 @@ final class ShinyCharmTests: XCTestCase {
     }
 
     func testConstantsAndPassiveFlag() {
-        XCTAssertEqual(ShinyCharm.price, EconomyScale.tokens(3_000_000_000))
+        XCTAssertEqual(ShinyCharm.price, 1_200)
         XCTAssertEqual(ShinyCharm.shinyDenominator, 48)
         XCTAssertTrue(ItemKind.shinyCharm.isPassive)
         XCTAssertFalse(ItemKind.rareCandy.isPassive)
@@ -65,7 +65,7 @@ final class ShinyCharmTests: XCTestCase {
         XCTAssertTrue(s.buy(.shinyCharm))
         XCTAssertTrue(s.ownsShinyCharm)
         XCTAssertEqual(s.itemCount(.shinyCharm), 1)
-        XCTAssertEqual(s.state.spentTokens, ShinyCharm.price, "지갑에서 부적 가격 차감")
+        XCTAssertEqual(s.state.coinsSpent, ShinyCharm.price, "지갑에서 부적 가격 차감")
         XCTAssertEqual(s.availableTokens, 5_000_000_000 - ShinyCharm.price)
     }
 
@@ -74,9 +74,9 @@ final class ShinyCharmTests: XCTestCase {
         let s = store(used: 10_000_000_000, charm: true)
         XCTAssertTrue(s.ownsShinyCharm)
         XCTAssertFalse(s.canBuy(.shinyCharm), "보유형은 재구매 불가")
-        let spentBefore = s.state.spentTokens
+        let spentBefore = s.state.coinsSpent
         XCTAssertFalse(s.buy(.shinyCharm), "재구매 no-op")
-        XCTAssertEqual(s.state.spentTokens, spentBefore, "지출 불변")
+        XCTAssertEqual(s.state.coinsSpent, spentBefore, "지출 불변")
         XCTAssertEqual(s.itemCount(.shinyCharm), 1, "개수 1 유지(2 안 됨)")
     }
 

@@ -9,7 +9,9 @@ private enum LinearIssuesTab: Hashable {
 @MainActor
 struct LinearIntegrationView: View {
     let store: UsageStore
-    @State private var selectedTab: LinearIssuesTab = .completedToday
+    var hub: WorkHub?
+    var companion: CompanionStore?
+    @State private var selectedTab: LinearIssuesTab = .inProgress
 
     private var l: L { L(store.localizationLanguage) }
 
@@ -48,8 +50,8 @@ struct LinearIntegrationView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Picker("", selection: $selectedTab) {
-                    Text(l.linearCompletedTodayTab).tag(LinearIssuesTab.completedToday)
                     Text(l.linearInProgressTab).tag(LinearIssuesTab.inProgress)
+                    Text(l.linearCompletedTodayTab).tag(LinearIssuesTab.completedToday)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -132,6 +134,14 @@ struct LinearIntegrationView: View {
             Text(issue.title)
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(.primary)
+
+            if selectedTab == .inProgress, let hub, let companion {
+                Button(l.markDone) {
+                    let item = LinearWorkSource.item(from: issue, status: .inProgress, now: Date())
+                    Task { await hub.complete(item, companion: companion) }
+                }
+                .controlSize(.small)
+            }
 
             if let text = issue.descriptionText, !text.isEmpty {
                 Text(text)

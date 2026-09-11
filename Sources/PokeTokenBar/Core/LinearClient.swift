@@ -21,8 +21,10 @@ struct LinearIssueSummary: Equatable, Sendable, Identifiable {
     var assigneeName: String?
     var assigneeEmail: String?
     var projectName: String?
+    var projectID: String?
     var teamName: String?
     var teamKey: String?
+    var teamID: String?
     var labelNames: [String]
     var createdAt: Date?
     var updatedAt: Date?
@@ -126,8 +128,8 @@ struct LinearClient: Sendable {
               estimate
               state { name type }
               assignee { name email }
-              project { name }
-              team { name key }
+              project { id name }
+              team { id name key }
               labels { nodes { name } }
               createdAt
               updatedAt
@@ -146,8 +148,8 @@ struct LinearClient: Sendable {
               estimate
               state { name type }
               assignee { name email }
-              project { name }
-              team { name key }
+              project { id name }
+              team { id name key }
               labels { nodes { name } }
               createdAt
               updatedAt
@@ -228,8 +230,10 @@ struct LinearClient: Sendable {
             assigneeName: assignee?["name"] as? String,
             assigneeEmail: assignee?["email"] as? String,
             projectName: project?["name"] as? String,
+            projectID: project?["id"] as? String,
             teamName: team?["name"] as? String,
             teamKey: team?["key"] as? String,
+            teamID: team?["id"] as? String,
             labelNames: labelNames,
             createdAt: parseDate(node["createdAt"]),
             updatedAt: parseDate(node["updatedAt"]),
@@ -303,6 +307,117 @@ struct LinearClient: Sendable {
             return LinearCompletedIssue(
                 id: id, identifier: identifier, title: title, completedAt: completedAt)
         }
+    }
+
+    func fetchProjects(apiKey: String) async throws -> [LinearProjectSummary] {
+        let query = """
+        query Projects {
+          projects(first: 50) {
+            nodes { id name }
+          }
+        }
+        """
+        let data = try await post(apiKey: apiKey, query: query, variables: [:])
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dataObj = root["data"] as? [String: Any],
+              let projects = dataObj["projects"] as? [String: Any],
+              let nodes = projects["nodes"] as? [[String: Any]]
+        else { throw LinearAPIError.decoding }
+        return nodes.compactMap { node in
+            guard let id = node["id"] as? String, !id.isEmpty,
+                  let name = node["name"] as? String, !name.isEmpty
+            else { return nil }
+            return LinearProjectSummary(id: id, name: name)
+        }
+    }
+
+    func fetchProjectIssues(apiKey: String, projectID: String) async throws -> [LinearIssueSummary] {
+        let query = """
+        query ProjectIssues($id: String!) {
+          project(id: $id) {
+            issues(first: 100) {
+              nodes {
+                id identifier title url description priority estimate
+                state { name type }
+                assignee { name email }
+                project { id name }
+                team { id name key }
+                labels { nodes { name } }
+                createdAt updatedAt dueDate completedAt
+              }
+            }
+          }
+        }
+        """
+        let data = try await post(apiKey: apiKey, query: query, variables: ["id": projectID])
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dataObj = root["data"] as? [String: Any],
+              let project = dataObj["project"] as? [String: Any],
+              let issues = project["issues"] as? [String: Any],
+              let nodes = issues["nodes"] as? [[String: Any]]
+        else { throw LinearAPIError.decoding }
+        return Self.sortedByPriority(try nodes.map(Self.parseIssueSummary))
+    }
+
+    func completeIssue(apiKey: String, issueID: String, teamID: String) async throws {
+        let stateID = try await completedStateID(apiKey: apiKey, teamID: teamID)
+        let mutation = """
+        mutation CompleteIssue($id: String!, $stateId: String!) {
+          issueUpdate(id: $id, input: { stateId: $stateId }) {
+            success
+          }
+        }
+        """
+        let data = try await post(
+            apiKey: apiKey,
+            query: mutation,
+            variables: ["id": issueID, "stateId": stateID])
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dataObj = root["data"] as? [String: Any],
+              let update = dataObj["issueUpdate"] as? [String: Any],
+              (update["success"] as? Bool) == true
+        else { throw LinearAPIError.decoding }
+    }
+
+    private func completedStateID(apiKey: String, teamID: String) async throws -> String {
+        let query = """
+        query TeamStates($id: String!) {
+          team(id: $id) {
+            states { nodes { id type } }
+          }
+        }
+        """
+        let data = try await post(apiKey: apiKey, query: query, variables: ["id": teamID])
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dataObj = root["data"] as? [String: Any],
+              let team = dataObj["team"] as? [String: Any],
+              let states = team["states"] as? [String: Any],
+              let nodes = states["nodes"] as? [[String: Any]]
+        else { throw LinearAPIError.decoding }
+        guard let completed = nodes.first(where: { ($0["type"] as? String)?.lowercased() == "completed" }),
+              let id = completed["id"] as? String, !id.isEmpty
+        else { throw LinearAPIError.decoding }
+        return id
+    }
+
+    private func post(apiKey: String, query: String, variables: [String: Any]) async throws -> Data {
+        var payload: [String: Any] = ["query": query]
+        if !variables.isEmpty { payload["variables"] = variables }
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let (status, data): (Int, Data)
+        do {
+            (status, data) = try await http.postGraphQL(apiKey: apiKey, body: body)
+        } catch {
+            throw LinearAPIError.transport
+        }
+        if status == 401 || status == 403 { throw LinearAPIError.unauthorized }
+        guard (200..<300).contains(status) else { throw LinearAPIError.httpStatus(status) }
+        if let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let errors = root["errors"] as? [[String: Any]], !errors.isEmpty {
+            if Self.containsUnauthorizedGraphQLError(errors) { throw LinearAPIError.unauthorized }
+            throw LinearAPIError.decoding
+        }
+        return data
     }
 }
 

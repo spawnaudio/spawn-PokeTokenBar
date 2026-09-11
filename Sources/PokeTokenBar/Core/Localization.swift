@@ -325,7 +325,7 @@ struct L {
         }
     }
     var timeXPTitle: String { t("시간 XP", "Time XP", "時間XP", "XP tiempo", "XP temps", "XP tempo", "Zeit-XP") }
-    var timeXPRewardRate: String { t("보상: 10분마다 +1M 토큰", "Reward: +1M tokens every 10 minutes", "報酬: 10分ごとに+1Mトークン", "Recompensa: +1M tokens cada 10 minutos", "Récompense : +1M tokens toutes les 10 minutes", "Recompensa: +1M tokens a cada 10 minutos", "Belohnung: +1M Tokens alle 10 Minuten") }
+    var timeXPRewardRate: String { t("보상: 10분마다 +5,000 XP · +1 코인", "Reward: +5,000 XP and +1 coin every 10 minutes", "報酬: 10分ごとに+5,000 XP・+1コイン", "Recompensa: +5.000 XP y +1 moneda cada 10 minutos", "Récompense : +5 000 XP et +1 pièce toutes les 10 minutes", "Recompensa: +5.000 XP e +1 moeda a cada 10 minutos", "Belohnung: +5.000 XP und +1 Münze alle 10 Minuten") }
     var timeXPTodayAwarded: String { t("오늘 획득 XP", "Today's XP", "本日の獲得XP", "XP de hoy", "XP du jour", "XP de hoje", "Heutige XP") }
     var timeXPDailyCap: String { t("일일 상한", "Daily cap", "1日上限", "Límite diario", "Plafond quotidien", "Limite diário", "Tageslimit") }
     var timeXPNextAward: String { t("다음 지급", "Next award", "次の付与", "Próxima recompensa", "Prochaine récompense", "Próxima recompensa", "Nächste Belohnung") }
@@ -869,11 +869,11 @@ struct L {
 
     // MARK: 상점 (재화 = 사용한 토큰)
     var shop: String { t("상점", "Shop", "ショップ", "Tienda", "Boutique", "Loja", "Laden") }
-    var spendableTokens: String { t("쓸 수 있는 토큰", "Spendable tokens", "使えるトークン", "Tokens disponibles", "Tokens disponibles", "Tokens disponíveis", "Verfügbare Tokens") }
-    var shopHint: String { t("사용한 토큰으로 아이템을 살 수 있어요.", "Spend the tokens you've used on items.", "使ったトークンでアイテムを購入できます。", "Usa los tokens que has consumido para comprar objetos.", "Dépense les tokens que tu as consommés pour acheter des objets.", "Compre itens com os tokens que você já usou.", "Mit deinen verbrauchten Tokens kannst du Gegenstände kaufen.") }
+    var spendableTokens: String { t("코인", "Coins", "コイン", "Monedas", "Pièces", "Moedas", "Münzen") }
+    var shopHint: String { t("완료한 일과 집중 시간으로 모은 코인으로 아이템을 살 수 있어요.", "Spend coins from completed work and focus time on items.", "完了した仕事と集中時間で貯めたコインでアイテムを買えます。", "Gasta las monedas de trabajo y tiempo de foco en objetos.", "Dépense les pièces gagnées en travaillant pour acheter des objets.", "Gaste moedas do trabalho concluído e do tempo de foco.", "Münzen aus erledigter Arbeit und Fokuszeit für Items ausgeben.") }
     var buy: String { t("구매", "Buy", "購入", "Comprar", "Acheter", "Comprar", "Kaufen") }
     func buyConfirm(_ name: String) -> String { t("\(name) 구매할까요?", "Buy \(name)?", "\(name) を購入しますか？", "¿Comprar \(name)?", "Acheter \(name) ?", "Comprar \(name)?", "\(name) kaufen?") }
-    var notEnoughTokens: String { t("토큰이 부족해요", "Not enough tokens", "トークンが足りません", "No tienes suficientes tokens", "Pas assez de tokens", "Tokens insuficientes", "Nicht genug Tokens") }
+    var notEnoughTokens: String { t("코인이 부족해요", "Not enough coins", "コインが足りません", "No tienes suficientes monedas", "Pas assez de pièces", "Moedas insuficientes", "Nicht genug Münzen") }
     func ownedCount(_ n: Int) -> String { t("보유 ×\(n)", "Owned ×\(n)", "所持 ×\(n)", "En posesión ×\(n)", "Possédés ×\(n)", "Você tem ×\(n)", "Im Beutel ×\(n)") }
     var shopPriceLabel: String { t("가격", "Price", "価格", "Precio", "Prix", "Preço", "Preis") }
     var ownedAlready: String { t("보유 중", "Owned", "所持済み", "En posesión", "Possédé", "Já tem", "Im Beutel") }
@@ -953,5 +953,52 @@ struct L {
           "Tu as atteint ta limite de tokens \(window). Une récompense pour l'effort — utilise-la pour faire évoluer ton Pokémon !",
           "Você esgotou seu limite de tokens — \(window). Você merece um agrado: use no seu Pokémon para evoluir!",
           "Du hast das Token-Limit für \(window) ausgeschöpft. Eine Belohnung für deinen Einsatz – verwende sie, um dein Pokémon zu entwickeln!")
+    }
+
+    var inboxTab: String { t("할 일", "Inbox", "タスク", "Bandeja", "Boîte", "Caixa", "Inbox") }
+    var inboxToday: String { t("오늘", "Today", "今日", "Hoy", "Aujourd'hui", "Hoje", "Heute") }
+    var inboxInProgress: String { t("진행 중", "In progress", "進行中", "En curso", "En cours", "Em andamento", "In Arbeit") }
+    var inboxCompleted: String { t("완료", "Completed", "完了", "Completadas", "Terminées", "Concluídas", "Erledigt") }
+    var inboxEmpty: String { t("할 일이 없습니다.", "Nothing here yet.", "タスクはまだありません。", "Aún no hay nada.", "Rien pour l’instant.", "Nada por aqui ainda.", "Noch nichts vorhanden.") }
+    var markDone: String { t("완료", "Done", "完了", "Hecho", "Fait", "Concluir", "Fertig") }
+    var addTask: String { t("할 일 추가", "Add task", "タスクを追加", "Añadir tarea", "Ajouter une tâche", "Adicionar tarefa", "Aufgabe hinzufügen") }
+    var addHabit: String { t("습관 추가", "Add habit", "習慣を追加", "Añadir hábito", "Ajouter une habitude", "Adicionar hábito", "Gewohnheit hinzufügen") }
+    var addRoutine: String { t("루틴 추가", "Add routine", "ルーチンを追加", "Añadir rutina", "Ajouter une routine", "Adicionar rotina", "Routine hinzufügen") }
+    var addGoal: String { t("목표 추가", "Add goal", "目標を追加", "Añadir meta", "Ajouter un objectif", "Adicionar meta", "Ziel hinzufügen") }
+    var newItemTitle: String { t("제목", "Title", "タイトル", "Título", "Titre", "Título", "Titel") }
+    var openMainWindow: String { t("메인 창", "Open window", "メインウィンドウ", "Abrir ventana", "Ouvrir la fenêtre", "Abrir janela", "Fenster öffnen") }
+    var projectsTitle: String { t("Linear 프로젝트", "Linear projects", "Linearプロジェクト", "Proyectos Linear", "Projets Linear", "Projetos Linear", "Linear-Projekte") }
+    var projectsEmpty: String { t("프로젝트가 없습니다.", "No projects.", "プロジェクトはありません。", "No hay proyectos.", "Aucun projet.", "Nenhum projeto.", "Keine Projekte.") }
+    var timerStart: String { t("타이머 시작", "Start timer", "タイマー開始", "Iniciar temporizador", "Démarrer le minuteur", "Iniciar timer", "Timer starten") }
+    var timerPause: String { t("일시정지", "Pause", "一時停止", "Pausa", "Pause", "Pausar", "Pause") }
+    var timerAssign: String { t("타이머에 할당", "Assign timer", "タイマーに割り当て", "Asignar temporizador", "Assigner le minuteur", "Atribuir timer", "Timer zuweisen") }
+    var timerClear: String { t("타이머 해제", "Clear timer", "タイマー解除", "Quitar temporizador", "Retirer le minuteur", "Limpar timer", "Timer entfernen") }
+    var remindersToggle: String { t("Apple 미리 알림", "Apple Reminders", "リマインダー", "Recordatorios de Apple", "Rappels Apple", "Lembretes da Apple", "Apple Erinnerungen") }
+    var appleCalendarToggle: String { t("Apple 캘린더", "Apple Calendar", "カレンダー", "Calendario de Apple", "Calendrier Apple", "Calendário da Apple", "Apple Kalender") }
+    var googleCalendarToggle: String { t("Google 캘린더", "Google Calendar", "Googleカレンダー", "Google Calendar", "Google Agenda", "Google Agenda", "Google Kalender") }
+    var googleClientID: String { t("Google 클라이언트 ID", "Google client ID", "GoogleクライアントID", "ID de cliente de Google", "ID client Google", "ID do cliente Google", "Google-Client-ID") }
+    var googleClientSecret: String { t("Google 클라이언트 시크릿", "Google client secret", "Googleクライアントシークレット", "Secreto de cliente de Google", "Secret client Google", "Segredo do cliente Google", "Google-Client-Secret") }
+    var googleSignIn: String { t("Google 로그인", "Sign in with Google", "Googleでサインイン", "Iniciar sesión con Google", "Connexion Google", "Entrar com o Google", "Mit Google anmelden") }
+    var googleSignOut: String { t("Google 로그아웃", "Sign out of Google", "Googleからサインアウト", "Cerrar sesión de Google", "Déconnexion Google", "Sair do Google", "Von Google abmelden") }
+    func rewardToast(xp: Int, coins: Int) -> String {
+        t("+\(xp) XP · +\(coins) 코인", "+\(xp) XP · +\(coins) coins", "+\(xp) XP · +\(coins)コイン", "+\(xp) XP · +\(coins) monedas", "+\(xp) XP · +\(coins) pièces", "+\(xp) XP · +\(coins) moedas", "+\(xp) XP · +\(coins) Münzen")
+    }
+    func workKindLabel(_ kind: WorkKind) -> String {
+        switch kind {
+        case .task: return t("할 일", "Task", "タスク", "Tarea", "Tâche", "Tarefa", "Aufgabe")
+        case .habit: return t("습관", "Habit", "習慣", "Hábito", "Habitude", "Hábito", "Gewohnheit")
+        case .routine: return t("루틴", "Routine", "ルーチン", "Rutina", "Routine", "Rotina", "Routine")
+        case .goal: return t("목표", "Goal", "目標", "Meta", "Objectif", "Meta", "Ziel")
+        case .event: return t("일정", "Event", "予定", "Evento", "Événement", "Evento", "Termin")
+        }
+    }
+    func completedTodayCount(_ n: Int) -> String {
+        t("오늘 완료 \(n)", "\(n) done today", "今日完了 \(n)", "\(n) hechas hoy", "\(n) terminées aujourd'hui", "\(n) concluídas hoje", "\(n) heute erledigt")
+    }
+    func goalTargetLabel(_ n: Int) -> String {
+        t("목표 \(n)", "Target \(n)", "目標 \(n)", "Meta \(n)", "Objectif \(n)", "Meta \(n)", "Ziel \(n)")
+    }
+    var routineStepsPlaceholder: String {
+        t("단계, 쉼표로 구분", "Steps, comma-separated", "ステップ（カンマ区切り）", "Pasos, separados por comas", "Étapes, séparées par des virgules", "Etapas, separadas por vírgulas", "Schritte, kommagetrennt")
     }
 }

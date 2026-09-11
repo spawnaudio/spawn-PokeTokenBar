@@ -112,6 +112,9 @@ final class LocalizationInterpolationTests: XCTestCase {
             // 상수 파생 치환 — 하드코딩으로 드리프트하면 사탕 설명이 실제 XP 와 어긋난다.
             expect(lang, "itemDescription(.rareCandy)", l.itemDescription(.rareCandy),
                    TokenFormatter.compact(RareCandy.xp))
+            expect(lang, "rewardToast", l.rewardToast(xp: 4242, coins: 1717), "4242", "1717")
+            expect(lang, "completedTodayCount", l.completedTodayCount(4242), "4242")
+            expect(lang, "goalTargetLabel", l.goalTargetLabel(4242), "4242")
             // Rarity label spliced into copy: a translation that spells the tier out
             // instead of substituting it is caught here.
             // 등급 라벨을 끼워 넣는 문구 — 번역이 치환 대신 등급을 고정 표기하면 여기서 걸린다.

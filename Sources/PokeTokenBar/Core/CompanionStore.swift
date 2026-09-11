@@ -28,6 +28,10 @@ final class CompanionStore {
     /// 사탕 사용 시 "+XP" 순간 표시 — 진화 없이 부분 진행일 때도 피드백. seq 증가로 CompanionHeader 감지.
     private(set) var candyFeedbackSeq = 0
     private(set) var candyFeedbackAmount = 0
+    /// Last task/time reward for toast UI (seq increments so a 0-xp coin-only grant still fires).
+    private(set) var lastReward: Reward = .zero
+    private(set) var lastRewardSeq = 0
+    func consumeLastReward() { lastReward = .zero }
     /// "+XP" 표시 1회성 보장 — CompanionHeader 가 재생 후 호출한다. 소비하지 않으면 다른 탭에 갔다
     /// 홈으로 재진입할 때(CompanionHeader 재마운트) @State 가 초기화돼 같은 값이 다시 떠오른다(회귀).
     func consumeCandyFeedback() { candyFeedbackAmount = 0 }
@@ -400,45 +404,22 @@ final class CompanionStore {
                         newLedger[providerID] = current
                     }
                     state.claimedTodayTokensByProvider = newLedger
-                    let delta = todayTokensByProvider.values.reduce(0, +)
-                    if delta > 0 {
-                        state.usedSinceInstall += delta
-                        if state.active == nil {
-                            state.eggUsage += delta
-                        } else {
-                            applyUsage(delta)
-                        }
-                    }
+                    // Token deltas no longer fund growth or the shop wallet.
                 } else {
                     var ledger = state.claimedTodayTokensByProvider ?? [:]
-                    var delta = 0
                     for (providerID, current) in todayTokensByProvider {
                         guard let previous = ledger[providerID] else {
-                            // 새로 관측된 프로바이더의 과거 로그를 소급하지 않는다. 이후 refresh부터
-                            // 해당 프로바이더의 증가분을 추적할 수 있도록 현재 값을 seed한다.
                             ledger[providerID] = current
                             continue
                         }
                         if current < previous {
-                            // 전체 합계가 아니라 해당 프로바이더의 line만 rebase한다. 다른 프로바이더가
-                            // 이번 refresh에서 보고하지 않았거나 carrier snapshot만 남은 경우에는 map에
-                            // line 자체가 없으므로 기존 기준값을 건드리지 않는다.
                             ledger[providerID] = current
                             AppLog.write("companion usage regression provider=\(providerID) date=\(todayDate) previous=\(previous) current=\(current) drop=\(previous - current) — rebased provider ledger")
                             continue
                         }
-                        delta += current - previous
                         ledger[providerID] = current
                     }
                     state.claimedTodayTokensByProvider = ledger
-                    if delta > 0 {
-                        state.usedSinceInstall += delta
-                        if state.active == nil {
-                            state.eggUsage += delta   // 알 인큐베이션 누적
-                        } else {
-                            applyUsage(delta)
-                        }
-                    }
                 }
             }
         }
@@ -674,11 +655,11 @@ final class CompanionStore {
         return new
     }
 
-    // MARK: 상점 (재화 = 사용한 토큰)
+    // MARK: 상점 (재화 = 코인)
 
-    /// 상점에서 쓸 수 있는 토큰(재화) = 실사용 누적 − 상점 지출 누적. 성장 미터(usedSinceInstall)는
-    /// 여기선 읽기만 — 구매는 spentTokens 만 올려 잔액을 깎는다(진화 진행·오늘/주/월 통계 무영향).
-    var availableTokens: Int { max(0, state.usedSinceInstall - state.spentTokens) }
+    var availableCoins: Int { max(0, state.coinsEarned - state.coinsSpent) }
+    /// Shop UI/tests historically used this name — it is now the coin wallet.
+    var availableTokens: Int { availableCoins }
 
     /// 상점 판매 아이템 — shopPrice 있는 것만. 가격 저렴한 순, 단 구매 완료한 보유형은 맨 아래로.
     var purchasableItems: [ItemKind] {
@@ -735,7 +716,7 @@ final class CompanionStore {
     func buy(_ kind: ItemKind) -> Bool {
         guard let price = kind.shopPrice, availableTokens >= price else { return false }
         if kind.isPassive && itemCount(kind) > 0 { return false }   // 보유형 중복 구매 방지(방어)
-        state.spentTokens += price
+        state.coinsSpent += price
         state.inventory[kind.rawValue, default: 0] += 1
         save()
         return true
@@ -775,7 +756,7 @@ final class CompanionStore {
     @discardableResult
     func buyEgg(_ tier: Rarity?) -> Bool {
         guard canBuyEgg(tier) else { return false }
-        state.spentTokens += FreshEgg.price(guaranteeing: tier)
+        state.coinsSpent += FreshEgg.price(guaranteeing: tier)
         if let a = state.active {
             state.dex.append(releasedDexEntry(from: a))   // 놓아줌 기록 — 도감에서 종이 사라지지 않게
         }
@@ -837,21 +818,21 @@ final class CompanionStore {
             return
         }
         let now = clock()
-        let credit = TimeOpenXP.credit(
+        let grant = TimeOpenXP.credit(
             now: now,
             day: today,
             lastAwardAt: state.lastTimeOpenAwardAt,
             awardDay: state.timeOpenAwardDay,
             awardedToday: state.timeOpenAwardedToday)
-        state.lastTimeOpenAwardAt = credit.awardedAt
-        state.timeOpenAwardDay = credit.day
-        state.timeOpenAwardedToday = credit.awardedToday
-        if credit.xp > 0 {
-            applyProgressXP(credit.xp)
+        state.lastTimeOpenAwardAt = grant.awardedAt
+        state.timeOpenAwardDay = grant.day
+        state.timeOpenAwardedToday = grant.awardedToday
+        if grant.xp > 0 || grant.coins > 0 {
+            self.credit(Reward(xp: grant.xp, coins: grant.coins), persist: false)
         }
     }
 
-    /// Growth-only XP (egg incubation or active stage). Skips `usedSinceInstall`.
+    /// Growth-only XP (egg incubation or active stage). Skips `usedSinceInstall` and coins.
     func applyProgressXP(_ delta: Int) {
         guard delta > 0 else { return }
         if state.active == nil {
@@ -861,22 +842,82 @@ final class CompanionStore {
         }
     }
 
-
-    
-    /// Credit XP for newly completed Linear issues. Seed poll records IDs with 0 XP.
+    /// Pay XP (growth) + coins (shop). Token usage never calls this.
     @discardableResult
-    func creditLinearCompletions(_ issues: [LinearCompletedIssue]) -> LinearRewards.Outcome {
-        let outcome = LinearRewards.evaluate(
-            issues: issues,
-            alreadyCredited: state.linearCreditedIssueIDs,
-            seeded: state.linearIntegrationSeeded)
-        state.linearCreditedIssueIDs = outcome.creditedIDs
-        state.linearIntegrationSeeded = outcome.seeded
-        if outcome.xp > 0 {
-            applyProgressXP(outcome.xp)
+    func credit(_ reward: Reward, persist: Bool = true) -> Reward {
+        guard reward.xp > 0 || reward.coins > 0 else { return .zero }
+        if reward.xp > 0 {
+            applyProgressXP(reward.xp)
+            candyFeedbackAmount = reward.xp
+            candyFeedbackSeq += 1
+        }
+        if reward.coins > 0 { state.coinsEarned += reward.coins }
+        lastReward = reward
+        lastRewardSeq += 1
+        if persist { save() }
+        return reward
+    }
+
+    /// Credit newly completed work items through the namespaced ledger (seed = 0 pay).
+    /// `forcePay` is for in-app complete: pay now without flipping the first-poll seed flag
+    /// (so a later Linear/Reminders poll still seeds historical IDs at 0).
+    @discardableResult
+    func creditWorkCompletions(_ items: [WorkItem], forcePay: Bool = false) -> CompletionLedger.Outcome {
+        guard !items.isEmpty else {
+            return CompletionLedger.Outcome(
+                newlyCredited: [],
+                creditedKeys: state.creditedWorkKeys,
+                seeded: state.workLedgerSeeded)
+        }
+        let wasSeeded = state.workLedgerSeeded
+        let keys = items.map(\.ledgerKey)
+        let outcome = CompletionLedger.evaluate(
+            incomingKeys: keys,
+            alreadyCredited: state.creditedWorkKeys,
+            seeded: forcePay ? true : wasSeeded)
+        state.creditedWorkKeys = outcome.creditedKeys
+        if !forcePay {
+            state.workLedgerSeeded = outcome.seeded
+            state.linearIntegrationSeeded = outcome.seeded
+        }
+        state.linearCreditedIssueIDs = outcome.creditedKeys
+            .filter { $0.hasPrefix("linear:") }
+            .map { String($0.dropFirst("linear:".count)) }
+        if outcome.newlyCredited.isEmpty == false {
+            let byKey = Dictionary(items.map { ($0.ledgerKey, $0) }, uniquingKeysWith: { _, last in last })
+            var total = Reward.zero
+            for key in outcome.newlyCredited {
+                if let item = byKey[key] {
+                    total = total + WorkReward.forCompletion(item)
+                }
+            }
+            _ = credit(total, persist: false)
         }
         save()
         return outcome
+    }
+
+    /// Legacy Linear-only entry point — maps completed issues into work items at default Linear rates.
+    @discardableResult
+    func creditLinearCompletions(_ issues: [LinearCompletedIssue]) -> LinearRewards.Outcome {
+        let items = issues.map {
+            WorkItem(
+                source: .linear,
+                remoteID: $0.id,
+                title: $0.title,
+                status: .completed,
+                kind: .task,
+                completedAt: $0.completedAt)
+        }
+        let outcome = creditWorkCompletions(items)
+        let xp = items.reduce(0) { sum, item in
+            outcome.newlyCredited.contains(item.ledgerKey) ? sum + WorkReward.forCompletion(item).xp : sum
+        }
+        return LinearRewards.Outcome(
+            xp: xp,
+            creditedIDs: state.linearCreditedIssueIDs,
+            seeded: outcome.seeded,
+            newlyCredited: issues.filter { outcome.newlyCredited.contains(CompletionLedger.key(source: .linear, remoteID: $0.id)) })
     }
 
     func grantCandies(from windows: [CandyWindow], limitsReady: Bool) {

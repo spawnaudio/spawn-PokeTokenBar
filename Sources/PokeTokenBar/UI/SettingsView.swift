@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(UsageStore.self) private var store
     @Environment(CompanionStore.self) private var companion
     @Environment(UpdateChecker.self) private var updater
+    @Environment(WorkHub.self) private var hub
     /// 팝오버 내부 화면 전환 방식 — sheet/dismiss 를 쓰지 않는다 (PopoverView 의 NOTE 참조)
     var onClose: () -> Void
     /// 기존 컬렉션의 도감으로 돌아가 대표 포켓몬을 고르게 한다.
@@ -22,6 +23,9 @@ struct SettingsView: View {
     @State private var didApplyStartExpanded = false
     @State private var sessionKeyInput = ""
     @State private var linearAPIKeyInput = ""
+    @State private var googleClientID = UserDefaults.standard.string(forKey: GoogleCalendarAuth.clientIDKey) ?? ""
+    @State private var googleClientSecret = UserDefaults.standard.string(forKey: GoogleCalendarAuth.clientSecretKey) ?? ""
+    @State private var googleOAuth = GoogleOAuthPresenter()
     @State private var isCheckingUpdate = false
     @State private var didCheckUpdate = false
     @State private var selectedScanProviderID = "claude_code"
@@ -470,8 +474,6 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    
-    @ViewBuilder
     private func linearIntegrationRows(_ store: UsageStore) -> some View {
         @Bindable var store = store
         groupRow {
@@ -535,7 +537,59 @@ struct SettingsView: View {
         }
     }
 
-private func advancedGroup(_ store: UsageStore) -> some View {
+    @ViewBuilder
+    private func workSourceRows() -> some View {
+        @Bindable var hub = hub
+        Divider()
+        groupRow {
+            Text(l.remindersToggle)
+            Spacer()
+            Toggle("", isOn: $hub.remindersEnabled)
+                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+        Divider()
+        groupRow {
+            Text(l.appleCalendarToggle)
+            Spacer()
+            Toggle("", isOn: $hub.appleCalendarEnabled)
+                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+        Divider()
+        groupRow {
+            Text(l.googleCalendarToggle)
+            Spacer()
+            Toggle("", isOn: $hub.googleCalendarEnabled)
+                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+        TextField(l.googleClientID, text: $googleClientID)
+            .textFieldStyle(.roundedBorder)
+            .padding(.horizontal, 12)
+            .onChange(of: googleClientID) { _, value in
+                UserDefaults.standard.set(value, forKey: GoogleCalendarAuth.clientIDKey)
+            }
+        SecureField(l.googleClientSecret, text: $googleClientSecret)
+            .textFieldStyle(.roundedBorder)
+            .padding(.horizontal, 12)
+            .onChange(of: googleClientSecret) { _, value in
+                UserDefaults.standard.set(value, forKey: GoogleCalendarAuth.clientSecretKey)
+            }
+        HStack {
+            Button(l.googleSignIn) {
+                Task { _ = try? await googleOAuth.signIn() }
+            }
+            .disabled(!GoogleCalendarAuth.isConfigured)
+            if GoogleTokenStore.load() != nil {
+                Button(l.googleSignOut, role: .destructive) {
+                    GoogleTokenStore.clear()
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.bottom, 6)
+    }
+
+    @ViewBuilder
+    private func advancedGroup(_ store: UsageStore) -> some View {
         @Bindable var store = store
         settingsSection(l.advancedSectionTitle) {
             Button {
@@ -566,6 +620,7 @@ private func advancedGroup(_ store: UsageStore) -> some View {
                     .task { await store.refreshSessionOrganizations() }
                 Divider()
                 linearIntegrationRows(store)
+                workSourceRows()
                 Divider()
                 groupRow {
                     VStack(alignment: .leading, spacing: 1) {

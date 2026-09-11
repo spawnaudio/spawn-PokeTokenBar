@@ -21,8 +21,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var outsideClickMonitor = OutsideClickMonitor()
     private var store: UsageStore!
     private var companion: CompanionStore!
+    private var hub: WorkHub!
+    private var focusTimer: FocusTimer!
     private var updater: UpdateChecker!
     private var floatingPet: FloatingPetController!
+    private var mainWindow: MainWindowController!
+    private var mainWindowOpen = false
     private let navigation = PopoverNavigation()
 
     // 메뉴바 캐릭터 애니메이션 — 단일 타이머로 프레임 순환.
@@ -80,14 +84,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         LoginItem.migrateFromLegacyLoginItemIfNeeded()   // 로그인아이템 → KeepAlive 에이전트(크래시 자동 재실행)
         store = UsageStore()
         companion = CompanionStore()
+        hub = WorkHub()
+        focusTimer = FocusTimer()
+        focusTimer.companion = companion
         updater = UpdateChecker()
         store.localizationLanguage = companion.language   // 알림 현지화용 미러 시드
         store.onRefresh = { [weak self] in self?.onStoreRefreshed() }   // 한도 로드 후 companion·사탕 지급
         floatingPet = FloatingPetController(
-            store: store, companion: companion,
+            store: store, companion: companion, hub: hub, timer: focusTimer,
             onOpenPopover: { [weak self] in self?.openPopover() },
             onHide: { [weak self] in self?.store.floatingPetEnabled = false }
         )   // 데스크톱 플로팅 펫(옵트인)
+        mainWindow = MainWindowController(
+            store: store, companion: companion, hub: hub, timer: focusTimer, updater: updater)
+        mainWindow.onOpenChange = { [weak self] open in
+            self?.mainWindowOpen = open
+            NSApp.setActivationPolicy(open ? .regular : .accessory)
+        }
+        NotificationCenter.default.addObserver(forName: .ptbOpenMainWindow, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.mainWindow.show() }
+        }
+        NotificationCenter.default.addObserver(forName: .ptbTimerStart, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.focusTimer.start() }
+        }
+        NotificationCenter.default.addObserver(forName: .ptbTimerPause, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.focusTimer.pause() }
+        }
+        NotificationCenter.default.addObserver(forName: .ptbTimerClear, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.focusTimer.clear() }
+        }
         Task { await updater.check() }                    // 기동 시 1회 업데이트 확인
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -117,6 +142,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func observeStore() {
         withObservationTracking {
             _ = store.menuTitle
+            _ = hub.completedTodayCount
+            _ = focusTimer.remainingText
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -166,7 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func applyState() {
         guard let button = statusItem.button else { return }
-        Self.applyMenuText(store.menuLines, to: button)
+        Self.applyMenuText(taskMenuLines(), to: button)
         needsSpriteLayout = true   // 텍스트 길이가 바뀌면 버튼 폭이 변해 이미지 자리도 움직인다
         // stale 시각 dim 제거 — 슬립/런치 직후 refresh 완료 전 몇 초간 회색으로 보여 '고장/비활성'
         // 으로 오인되던 것 방지(사용자 반복 지적). 데이터가 오래됐다는 신호가 필요하면 팝오버
@@ -178,6 +205,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         syncMenuAnimation()   // 가시성 상태 주기적 재평가(occlusion 이 잘못 멈춰도 자가 복구)
         // 같은 프레임이면 setStatusImage 가 diff-gate 로 조기 반환해 재배치를 못 했을 수 있다.
         if needsSpriteLayout { layoutSpriteLayer() }
+    }
+
+    private func taskMenuLines() -> [String] {
+        if let remaining = focusTimer.remainingText { return [remaining] }
+        let done = hub.completedTodayCount
+        if done > 0 { return ["\(done)"] }
+        return []
     }
 
     /// 메뉴바 버튼 텍스트 반영 — 1줄이면 기본 title(13pt), 2줄 이상이면 세로 스택.
@@ -237,11 +271,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// UsageStore.onRefresh 주석 참조(observeStore 만으론 한도 변경이 companion 에 안 전달되는 케이스).
     private func onStoreRefreshed() {
         updateCompanion()
-        companion.grantCandies(from: store.candyEligibleWindows, limitsReady: store.limitsReady)
-        guard store.linearIntegrationEnabled else { return }
         Task { @MainActor in
-            let issues = await store.fetchLinearCompletionsForCompanion()
-            _ = companion.creditLinearCompletions(issues)
+            await hub.refreshAll(companion: companion)
         }
     }
 
@@ -535,7 +566,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func buildPopoverContent() {
         popover.contentViewController = NSHostingController(
             rootView: PopoverView()
-                .environment(store).environment(companion).environment(updater).environment(navigation))
+                .environment(store).environment(companion).environment(updater)
+                .environment(navigation).environment(hub).environment(focusTimer))
     }
 
     @objc private func togglePopover() {

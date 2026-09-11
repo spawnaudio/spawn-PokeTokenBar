@@ -190,7 +190,7 @@ final class DittoRevealTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("ditto-race-\(UUID().uuidString).json")
         let firstEvo = PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
         let active = "{\"baseID\":1,\"pathIDs\":[1],\"plannedPathIDs\":[1,2,3],\"stageIndex\":0,\"usedAtStage\":\(firstEvo),\"rarity\":\"common\",\"totalForms\":3,\"dittoDisguise\":1}"
-        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":2000000000,\"lastDate\":\"d1\",\"active\":\(active),\"dex\":[],\"collectedFinals\":[]}"
+        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":2000000000,\"coinsEarned\":2000000000,\"lastDate\":\"d1\",\"active\":\(active),\"dex\":[],\"collectedFinals\":[]}"
         try Data(json.utf8).write(to: url)
         let provider = DelayedDittoProvider()
         var seed: UInt64?

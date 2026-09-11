@@ -32,8 +32,8 @@ final class PokemonBalanceTests: XCTestCase {
     func testEconomyScaleAppliesToOfficialTokenCosts() {
         XCTAssertEqual(EconomyScale.factor, 0.01)
         XCTAssertEqual(PokemonBalance.eggHatchThreshold, EconomyScale.tokens(5_000_000))
-        XCTAssertEqual(RareCandy.price, EconomyScale.tokens(500_000_000))
-        XCTAssertEqual(FreshEgg.price, EconomyScale.tokens(1_000_000_000))
+        XCTAssertEqual(RareCandy.price, 200)
+        XCTAssertEqual(FreshEgg.price, 400)
     }
     func testRarityDerivation() {
         XCTAssertEqual(Rarity.from(captureRate: 255, isLegendary: false, isMythical: false), .common)
@@ -467,7 +467,7 @@ final class CompanionStoreTests: XCTestCase {
                               rarity: .common, totalForms: 3)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("poke-\(UUID().uuidString).json")
         let activeJSON = String(decoding: try JSONEncoder().encode(active), as: UTF8.self)
-        try Data(#"{"active":\#(activeJSON),"representativeSpeciesID":1,"usedSinceInstall":1000000000}"#.utf8)
+        try Data(#"{"active":\#(activeJSON),"representativeSpeciesID":1,"usedSinceInstall":1000000000,"coinsEarned":1000000000}"#.utf8)
             .write(to: url)
 
         let s = CompanionStore(provider: StubProvider(value: linear3), clock: { fixedNow },
@@ -619,7 +619,7 @@ final class CompanionStoreTests: XCTestCase {
                               usedAtStage: 0, rarity: .common, totalForms: 3)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("poke-\(UUID().uuidString).json")
         let activeJSON = String(decoding: try JSONEncoder().encode(active), as: UTF8.self)
-        try Data(#"{"active":\#(activeJSON),"usedSinceInstall":5000000000}"#.utf8).write(to: url)
+        try Data(#"{"active":\#(activeJSON),"usedSinceInstall":5000000000,"coinsEarned":5000000000}"#.utf8).write(to: url)
 
         let s = CompanionStore(provider: StubProvider(value: linear3), clock: { fixedNow },
                                fileURL: url, rng: SeededRNG(seed: 7))
@@ -641,7 +641,7 @@ final class CompanionStoreTests: XCTestCase {
                               dittoDisguise: 1, dittoRevealed: false)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("poke-\(UUID().uuidString).json")
         let activeJSON = String(decoding: try JSONEncoder().encode(active), as: UTF8.self)
-        try Data(#"{"active":\#(activeJSON),"usedSinceInstall":5000000000}"#.utf8).write(to: url)
+        try Data(#"{"active":\#(activeJSON),"usedSinceInstall":5000000000,"coinsEarned":5000000000}"#.utf8).write(to: url)
 
         let s = CompanionStore(provider: StubProvider(value: linear3), clock: { fixedNow },
                                fileURL: url, rng: SeededRNG(seed: 7))
@@ -696,7 +696,8 @@ final class CompanionStoreTests: XCTestCase {
         XCTAssertEqual(s.state.usedSinceInstall, 0)
         // 이후 증가분만 누적
         s.update(todayTokensByProvider: ["test": 148_000_000], todayDate: "d1", monthTotal: 0, burnTier: .idle, limitWarning: false, hasUsageData: true)
-        XCTAssertEqual(s.state.usedSinceInstall, 100_000_000)
+        XCTAssertEqual(s.state.usedSinceInstall, 0, "token usage no longer funds growth")
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 148_000_000)
     }
 
     /// [회귀] 로컬 사용량 재집계가 기존 값보다 낮아진 뒤에도, 새 기준점 이후의 증가분은 알에 반영한다.
@@ -705,17 +706,18 @@ final class CompanionStoreTests: XCTestCase {
         let s = store(linear3)
         base(s)
         use(s, 200)
-        XCTAssertEqual(s.state.eggUsage, 200)
+        XCTAssertEqual(s.state.eggUsage, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 200)
 
-        // 유효한 낮은 스냅샷: 이 자체는 토큰 사용량으로 지급하지 않고 기준점만 재설정한다.
+        // 유효한 낮은 스냅샷: 성장이 아니라 기준점만 재설정한다.
         use(s, 40)
-        XCTAssertEqual(s.state.eggUsage, 200)
+        XCTAssertEqual(s.state.eggUsage, 0)
         XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 40)
 
-        // 새 기준점 이후의 증가분만 반영한다.
         use(s, 75)
-        XCTAssertEqual(s.state.eggUsage, 235)
-        XCTAssertEqual(s.state.usedSinceInstall, 235)
+        XCTAssertEqual(s.state.eggUsage, 0)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 75)
     }
 
     /// [회귀] 데이터 공백/조회 실패로 today=0 이 들어와도 당일 기준점을 0으로 낮추지 않는다.
@@ -726,12 +728,13 @@ final class CompanionStoreTests: XCTestCase {
         use(s, 200)
 
         use(s, 0, hasUsageData: false) // 빈 스냅샷/조회 공백
-        XCTAssertEqual(s.state.eggUsage, 200)
+        XCTAssertEqual(s.state.eggUsage, 0)
         XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 200)
 
         use(s, 250)
-        XCTAssertEqual(s.state.eggUsage, 250)
-        XCTAssertEqual(s.state.usedSinceInstall, 250)
+        XCTAssertEqual(s.state.eggUsage, 0)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["test"], 250)
     }
 
     /// [회귀] 프로바이더 하나가 일시적으로 snapshot을 내놓지 않아도 다른 프로바이더의
@@ -740,19 +743,20 @@ final class CompanionStoreTests: XCTestCase {
         let s = store(linear3)
         useMap(s, ["claude_code": 0, "codex": 0])
         useMap(s, ["claude_code": 1_000, "codex": 500])
-        XCTAssertEqual(s.state.usedSinceInstall, 1_500)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["claude_code": 1_000, "codex": 500])
 
         // codex today == nil인 carrier snapshot은 map에서 빠진다. codex line은 그대로 보존한다.
         useMap(s, ["claude_code": 1_000], hasUsageData: true)
-        XCTAssertEqual(s.state.usedSinceInstall, 1_500)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
         XCTAssertEqual(s.state.claimedTodayTokensByProvider,
                        ["claude_code": 1_000, "codex": 500])
 
-        // 복구된 codex의 기존 500을 다시 지급하지 않고 이후 증가분만 지급한다.
         useMap(s, ["claude_code": 1_000, "codex": 500])
-        XCTAssertEqual(s.state.usedSinceInstall, 1_500)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
         useMap(s, ["claude_code": 1_000, "codex": 700])
-        XCTAssertEqual(s.state.usedSinceInstall, 1_700)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["codex"], 700)
     }
 
     /// [회귀] carrier만 남아 오늘 map이 비어도 프로바이더별 ledger를 0으로 낮추지 않는다.
@@ -761,14 +765,16 @@ final class CompanionStoreTests: XCTestCase {
         let s = store(linear3)
         useMap(s, ["codex": 0])
         useMap(s, ["codex": 2_000])
-        XCTAssertEqual(s.state.usedSinceInstall, 2_000)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 2_000])
 
         useMap(s, [:], hasUsageData: false)
-        XCTAssertEqual(s.state.usedSinceInstall, 2_000)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
         XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 2_000])
 
         useMap(s, ["codex": 2_200])
-        XCTAssertEqual(s.state.usedSinceInstall, 2_200)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 2_200])
     }
 
     /// [회귀] 날짜가 바뀌면 이전 날짜의 provider별 기준값과 비교하지 않고,
@@ -777,14 +783,15 @@ final class CompanionStoreTests: XCTestCase {
         let s = store(linear3)
         useMap(s, ["codex": 0], date: "d1")
         useMap(s, ["codex": 200], date: "d1")
-        XCTAssertEqual(s.state.usedSinceInstall, 200)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
 
         useMap(s, ["codex": 100], date: "d2")
-        XCTAssertEqual(s.state.usedSinceInstall, 300)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
         XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 100])
 
         useMap(s, ["codex": 150], date: "d2")
-        XCTAssertEqual(s.state.usedSinceInstall, 350)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 150])
     }
 
     /// [회귀] 날짜 경계의 첫 refresh에서 provider 하나가 빠져도, 같은 날 복구된 현재 사용량을
@@ -794,21 +801,20 @@ final class CompanionStoreTests: XCTestCase {
         let s = store(linear3)
         useMap(s, ["claude_code": 0, "codex": 0], date: "d1")
         useMap(s, ["claude_code": 1_000, "codex": 500], date: "d1")
-        XCTAssertEqual(s.state.usedSinceInstall, 1_500)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
 
-        // 날짜가 바뀐 첫 응답에는 codex가 빠졌다. Claude의 d2 사용량만 먼저 적립한다.
         useMap(s, ["claude_code": 100], date: "d2")
-        XCTAssertEqual(s.state.usedSinceInstall, 1_600)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
         XCTAssertEqual(s.state.claimedTodayTokensByProvider,
                        ["claude_code": 100, "codex": 0])
 
-        // 같은 날 codex가 복구되면 d2의 현재 누적값 전체가 적립되어야 한다.
         useMap(s, ["claude_code": 100, "codex": 700], date: "d2")
-        XCTAssertEqual(s.state.usedSinceInstall, 2_300)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["codex"], 700)
 
-        // 이후에는 복구 시점 기준의 증가분만 적립한다.
         useMap(s, ["claude_code": 100, "codex": 900], date: "d2")
-        XCTAssertEqual(s.state.usedSinceInstall, 2_500)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider?["codex"], 900)
     }
 
     /// [회귀] stale snapshot처럼 오늘 provider map이 비어 있는 refresh는 날짜 경계를 소비하지
@@ -819,12 +825,13 @@ final class CompanionStoreTests: XCTestCase {
         useMap(s, ["codex": 200], date: "d1")
 
         useMap(s, [:], date: "d2", hasUsageData: true)
-        XCTAssertEqual(s.state.usedSinceInstall, 200)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
         XCTAssertEqual(s.state.lastDate, "d1")
         XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 200])
 
         useMap(s, ["codex": 100], date: "d2")
-        XCTAssertEqual(s.state.usedSinceInstall, 300)
+        XCTAssertEqual(s.state.usedSinceInstall, 0)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 100])
     }
 
     /// [마이그레이션] aggregate high-water mark만 가진 구버전 세이브는 값을 프로바이더별로
@@ -845,7 +852,8 @@ final class CompanionStoreTests: XCTestCase {
 
         s.update(todayTokensByProvider: ["codex": 700], todayDate: "d1", monthTotal: 0,
                  burnTier: .idle, limitWarning: false, hasUsageData: true)
-        XCTAssertEqual(s.state.usedSinceInstall, 10_200)
+        XCTAssertEqual(s.state.usedSinceInstall, 10_000)
+        XCTAssertEqual(s.state.claimedTodayTokensByProvider, ["codex": 700])
     }
 
     private func base(_ s: CompanionStore) {
@@ -864,7 +872,7 @@ final class CompanionStoreTests: XCTestCase {
         let s = store(linear3)
         base(s)
         let below = max(1, PokemonBalance.eggHatchThreshold / 2)
-        use(s, below)
+        s.applyProgressXP(below)
         XCTAssertEqual(s.state.eggUsage, below)
         XCTAssertTrue(s.isEgg)
         await s.hatchIfNeeded()
@@ -874,7 +882,7 @@ final class CompanionStoreTests: XCTestCase {
     func testEggHatchesAtThreshold() async {
         let s = store(linear3)
         base(s)
-        use(s, PokemonBalance.eggHatchThreshold)   // = 1M
+        s.applyProgressXP(PokemonBalance.eggHatchThreshold)
         XCTAssertEqual(s.state.eggUsage, PokemonBalance.eggHatchThreshold)
         await s.hatchIfNeeded()
         XCTAssertNotNil(s.state.active)
@@ -951,7 +959,7 @@ final class CompanionStoreTests: XCTestCase {
     func testEggOverflowCarriesToHatchedMon() async {
         let s = store(linear3)
         base(s)
-        use(s, PokemonBalance.eggHatchThreshold + 500_000)   // 임계 초과 0.5M
+        s.applyProgressXP(PokemonBalance.eggHatchThreshold + 500_000)
         await s.hatchIfNeeded()
         XCTAssertEqual(s.state.active?.usedAtStage, 500_000)   // 초과분 이월
     }
@@ -962,7 +970,7 @@ final class CompanionStoreTests: XCTestCase {
         let s = CompanionStore(provider: FallbackOnlyProvider(),
                                clock: { fixedNow }, fileURL: url, rng: SeededRNG(seed: 7))
         base(s)
-        use(s, PokemonBalance.eggHatchThreshold)
+        s.applyProgressXP(PokemonBalance.eggHatchThreshold)
         await s.hatchIfNeeded()
         XCTAssertNotNil(s.state.active, "인덱스 장애 시 REST 폴백으로 부화해야 함")
         XCTAssertEqual(s.state.eggUsage, 0)
@@ -971,7 +979,7 @@ final class CompanionStoreTests: XCTestCase {
     func testNewEggAfterGraduationReincubates() async {
         let s = store(noEvo)
         base(s)
-        use(s, PokemonBalance.eggHatchThreshold)
+        s.applyProgressXP(PokemonBalance.eggHatchThreshold)
         await s.hatchIfNeeded()
         XCTAssertNotNil(s.state.active)
         s.applyUsage(PokemonBalance.graduationTotal(.common))   // 무진화 졸업
@@ -1606,7 +1614,7 @@ final class CompanionIdentityTests: XCTestCase {
         let overflow = PokemonBalance.eggHatchThreshold
             + PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 0)
             + PokemonBalance.phaseThreshold(rarity: .common, totalForms: 3, stageIndex: 1) / 2
-        s.update(todayTokensByProvider: ["test": overflow], todayDate: "d1", monthTotal: 0, burnTier: .idle, limitWarning: false, hasUsageData: true)
+        s.applyProgressXP(overflow)
         await s.hatchIfNeeded()
         XCTAssertEqual(s.state.active?.isShiny, true)
         XCTAssertEqual(s.state.active?.stageIndex, 1, "이월로 1회 진화했어야 함")
@@ -1619,7 +1627,7 @@ final class CompanionIdentityTests: XCTestCase {
         s.update(todayTokensByProvider: ["test": 0], todayDate: "d1", monthTotal: 0, burnTier: .idle, limitWarning: false, hasUsageData: true)
         // 알 임계 + 졸업 총량 초과
         let overflow = PokemonBalance.eggHatchThreshold + PokemonBalance.graduationTotal(.common) + 5_000_000
-        s.update(todayTokensByProvider: ["test": overflow], todayDate: "d1", monthTotal: 0, burnTier: .idle, limitWarning: false, hasUsageData: true)
+        s.applyProgressXP(overflow)
         await s.hatchIfNeeded()
         XCTAssertNil(s.state.active, "즉시 졸업")
         XCTAssertEqual(s.state.dex.count, 1)
@@ -1720,7 +1728,7 @@ final class CompanionIdentityTests: XCTestCase {
         for _ in 0..<50 where s.state.pendingHatchID == nil { await Task.yield() }
         XCTAssertEqual(s.state.pendingHatchID, 77, "알 상태에서 종이 미리 롤/저장돼야 한다")
         // 임계 도달 → 부화는 pending 그대로 (추가 선택 롤 없음: shiny/nature 만 소비)
-        s.update(todayTokensByProvider: ["test": 6_000_000], todayDate: "d1", monthTotal: 0, burnTier: .idle, limitWarning: false, hasUsageData: true)
+        s.applyProgressXP(PokemonBalance.eggHatchThreshold)
         await s.hatchIfNeeded()
         XCTAssertEqual(s.state.active?.baseID, 77)
         XCTAssertNil(s.state.pendingHatchID, "부화 후 pending 은 비워져야 한다")

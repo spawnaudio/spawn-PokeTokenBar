@@ -66,6 +66,7 @@ final class TimeOpenCompanionTests: XCTestCase {
             hasUsageData: true)
 
         XCTAssertEqual(store.state.eggUsage, TimeOpenXP.tokensPerAward * 2)
+        XCTAssertEqual(store.state.coinsEarned, TimeOpenXP.coinsPerAward * 2)
         XCTAssertEqual(store.state.usedSinceInstall, 0,
                        "time XP must not inflate shop/usage totals")
     }

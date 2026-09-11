@@ -1,26 +1,26 @@
 import Foundation
 
-/// Passive companion XP while the menu-bar app is open (refresh-driven).
+/// Passive companion XP + coins while the menu-bar app is open (refresh-driven).
 ///
-/// Credits wall-clock time between `CompanionStore.update` ticks into the same growth
-/// meter as token usage (`eggUsage` / `applyUsage`), without inflating `usedSinceInstall`
-/// (shop wallet / real-usage stats stay usage-only — same rule as Rare Candy).
+/// Credits wall-clock time between ticks into growth (`eggUsage` / `applyUsage`) and coins,
+/// without inflating `usedSinceInstall`.
 enum TimeOpenXP {
-    /// Reward cadence: +1M growth XP every 10 minutes of active open time.
     static let awardIntervalSeconds: TimeInterval = 10 * 60
-    static let tokensPerAward = 1_000_000
-    /// Cap catch-up so wake from sleep cannot dump hours of AFK XP at once.
-    /// We keep only one interval worth of backlog.
+    static let tokensPerAward = 5_000
+    static let coinsPerAward = 1
     static let maxGapSeconds: TimeInterval = awardIntervalSeconds
-    /// Per calendar-day cap (local `yyyy-MM-dd`) so idle open cannot outpace usage forever.
-    /// 144 intervals/day × 1M.
-    static let dailyCap = tokensPerAward * 144
+    /// 6 hours of grants per local day (36 intervals).
+    static let dailyCapIntervals = 36
+    static let dailyCap = tokensPerAward * dailyCapIntervals
 
     struct Credit: Equatable, Sendable {
         var xp: Int
         var awardedToday: Int
         var day: String
         var awardedAt: Date
+
+        var coins: Int { (xp / tokensPerAward) * coinsPerAward }
+        var intervals: Int { xp / tokensPerAward }
     }
 
     /// Pure credit calculation — no I/O. `nil` is never returned; callers always persist the
@@ -39,10 +39,8 @@ enum TimeOpenXP {
             dayKey = day
         }
         guard let last = lastAwardAt else {
-            // Seed only — avoid a huge catch-up grant on first enable / upgrade / import.
             return Credit(xp: 0, awardedToday: awarded, day: dayKey, awardedAt: now)
         }
-        // Drop backlog older than maxGap so sleep/wake doesn't leak hours of AFK credit.
         let effectiveLast = max(last, now.addingTimeInterval(-maxGapSeconds))
         let elapsed = now.timeIntervalSince(effectiveLast)
         guard elapsed > 0 else {

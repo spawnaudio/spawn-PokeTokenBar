@@ -76,7 +76,7 @@ final class PremiumEggTests: XCTestCase {
         let f = file ?? url()
         let mon = "{\"baseID\":10,\"pathIDs\":[10],\"stageIndex\":0,\"usedAtStage\":200000000,"
             + "\"rarity\":\"common\",\"totalForms\":3,\"isShiny\":false}"
-        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":\(used),\"spentTokens\":0,"
+        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":0,\"coinsEarned\":\(used),\"coinsSpent\":0,"
             + "\"lastDate\":\"d\",\"active\":\(mon),\"dex\":[],\"collectedFinals\":[]}"
         try? json.data(using: .utf8)!.write(to: f)
         return CompanionStore(provider: provider, clock: { self.now }, fileURL: f, rng: SeededRNG(seed: 7))
@@ -124,9 +124,9 @@ final class PremiumEggTests: XCTestCase {
     // MARK: 가격 — 졸업 총량 배율(새 상수 금지)
 
     func testPricesFollowGraduationTotalRatio() {
-        XCTAssertEqual(FreshEgg.price(guaranteeing: nil), EconomyScale.tokens(1_000_000_000))
-        XCTAssertEqual(FreshEgg.price(guaranteeing: .uncommon), EconomyScale.tokens(2_500_000_000))
-        XCTAssertEqual(FreshEgg.price(guaranteeing: .rare), EconomyScale.tokens(4_000_000_000))
+        XCTAssertEqual(FreshEgg.price(guaranteeing: nil), 400)
+        XCTAssertEqual(FreshEgg.price(guaranteeing: .uncommon), 1_000)
+        XCTAssertEqual(FreshEgg.price(guaranteeing: .rare), 1_600)
         XCTAssertEqual(FreshEgg.shopTiers, [nil, .uncommon, .rare])
     }
 
@@ -179,7 +179,7 @@ final class PremiumEggTests: XCTestCase {
         XCTAssertTrue(s.buyEgg(.rare))
         XCTAssertEqual(s.state.eggTier, .rare, "보증이 상태에 기록됨")
         XCTAssertEqual(s.eggGuarantee, .rare)
-        XCTAssertEqual(s.state.spentTokens, FreshEgg.price(guaranteeing: .rare))
+        XCTAssertEqual(s.state.coinsSpent, FreshEgg.price(guaranteeing: .rare))
         XCTAssertNil(s.state.active, "현재 포켓몬은 더 이상 활성이 아니다")
         XCTAssertEqual(s.state.eggUsage, 0, "새 알은 처음부터 인큐베이션")
         // 등급 알도 새 알과 같은 놓아줌 경로를 쓴다 — 종은 남기되 졸업으로 세지는 않는다.
@@ -196,18 +196,18 @@ final class PremiumEggTests: XCTestCase {
             XCTAssertFalse(s.canBuyEgg(tier))
             XCTAssertFalse(s.buyEgg(tier))
         }
-        XCTAssertEqual(s.state.spentTokens, 0, "no-op")
+        XCTAssertEqual(s.state.coinsSpent, 0, "no-op")
     }
 
     /// 잔액이 그 **티어의** 가격에 미달이면 불가 — 기본 알은 살 수 있어도 희귀 알은 못 산다.
     func testFundsAreCheckedAgainstTierPrice() {
-        let s = activeStore(used: EconomyScale.tokens(3_000_000_000))   // 기본·고급 알은 되고 희귀 알은 안 되는 잔액
+        let s = activeStore(used: 1_200)   // 기본·고급 알은 되고 희귀 알은 안 되는 잔액
         XCTAssertTrue(s.canBuyEgg(nil))
         XCTAssertTrue(s.canBuyEgg(.uncommon))
         XCTAssertFalse(s.canBuyEgg(.rare))
         XCTAssertFalse(s.buyEgg(.rare))
         XCTAssertNotNil(s.state.active, "실패 시 활성 유지")
-        XCTAssertEqual(s.state.spentTokens, 0)
+        XCTAssertEqual(s.state.coinsSpent, 0)
     }
 
     /// 이전 보증으로 미리 뽑아둔 종(pendingHatchID)은 구매 시 버려야 한다 — 안 버리면 보증 없이 뽑은
@@ -424,7 +424,7 @@ final class PremiumEggTests: XCTestCase {
         XCTAssertFalse(FreshEgg.shopTiers.contains(.legendary))
         XCTAssertFalse(s.canBuyEgg(.legendary))
         XCTAssertFalse(s.buyEgg(.legendary))
-        XCTAssertEqual(s.state.spentTokens, 0, "차감 없음")
+        XCTAssertEqual(s.state.coinsSpent, 0, "차감 없음")
         XCTAssertNotNil(s.state.active, "폐기 없음")
         XCTAssertFalse(s.canBuyEgg(.common), "기본 알은 tier nil 로만 판다")
     }

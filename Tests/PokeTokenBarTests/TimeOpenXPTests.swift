@@ -22,6 +22,7 @@ final class TimeOpenXPTests: XCTestCase {
             awardDay: day,
             awardedToday: 0)
         XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerAward)
+        XCTAssertEqual(credit.coins, TimeOpenXP.coinsPerAward)
         XCTAssertEqual(credit.awardedToday, TimeOpenXP.tokensPerAward)
     }
 
@@ -77,5 +78,11 @@ final class TimeOpenXPTests: XCTestCase {
         XCTAssertEqual(credit.day, "2026-09-07")
         XCTAssertEqual(credit.xp, TimeOpenXP.tokensPerAward)
         XCTAssertEqual(credit.awardedToday, TimeOpenXP.tokensPerAward)
+    }
+
+    func testDailyCapIsSixHoursOfIntervals() {
+        XCTAssertEqual(TimeOpenXP.dailyCapIntervals, 36)
+        XCTAssertEqual(TimeOpenXP.dailyCap, TimeOpenXP.tokensPerAward * 36)
+        XCTAssertEqual(TimeOpenXP.awardIntervalSeconds, 10 * 60)
     }
 }

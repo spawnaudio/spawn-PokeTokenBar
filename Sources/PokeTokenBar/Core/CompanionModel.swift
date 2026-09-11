@@ -177,25 +177,20 @@ enum RareCandy {
     static let xp = 1_500_000
     /// 주간 한도 100% 도달 시 지급 개수(세션급은 1개).
     static let weeklyGrant = 5
-    /// 상점 구매가(재화 = 사용한 토큰: usedSinceInstall − spentTokens).
-    /// 토큰이 "성장 미터 + 상점 지갑"으로 이중 사용되는 구조라, 가격을 XP 와 같게 두면 구매가 사실상
-    /// 공짜 추가성장이 된다. Upstream 500M(스케일 후 XP 대비 훨씬 큼) — 상점 사탕은 편의 소비,
-    /// 무료 획득(한도 100% 보상)이 항상 이득.
-    static let price = EconomyScale.tokens(500_000_000)
+    /// 상점 구매가(재화 = 코인).
+    static let price = 200
 }
 
 /// 민트 밸런스 상수.
 enum Mint {
-    /// 상점 구매가. 성격 변경은 순수 코스메틱(성장·능력치 무관)이라 밸런스 근거가 없어 "느낌" 값 —
-    /// 사탕의 1/5로 싸게 둬서 성격을 마음에 들 때까지 굴려보는 가벼운 재미. 성장을 안 줘서
-    /// 이중계산 이슈도 없음(가격 = 순수 소비).
-    static let price = EconomyScale.tokens(100_000_000)
+    /// 상점 구매가(재화 = 코인).
+    static let price = 80
 }
 
 /// 이로치 부적 밸런스 상수 — 보유형(1회 구매·영구, 소비 안 됨).
 enum ShinyCharm {
-    /// 상점 구매가. 앞으로의 모든 부화에 적용되는 영구 럭 업그레이드라 프리미엄(레어 1마리 졸업분).
-    static let price = EconomyScale.tokens(3_000_000_000)
+    /// 상점 구매가(재화 = 코인).
+    static let price = 1_200
     /// 보유 시 이로치 부화 확률 분모 — 1/64 → 1/48 (+33%). 본가 '반짝이 부적'(이로치 확률↑) 오마주.
     /// ×2(1/32)는 과해 절제. 이미 부화한 개체엔 소급 없음(이로치는 부화 순간 확정).
     static let shinyDenominator: UInt64 = 48
@@ -206,7 +201,7 @@ enum FreshEgg {
     /// 상점 구매가. 마음에 안 드는 부화를 리롤하는 프리미엄(쌓인 토큰의 활용처). 폐기 개체는 졸업이
     /// 아니라 그냥 사라지므로 도감·확률(collectedFinals)에 무영향 — "뽑은 적 없던 것처럼". 새 알은
     /// 처음부터 재인큐베이션 필요 + 성장(usedAtStage) 소멸이라 스팸/파밍이 자연 억제된다.
-    static let price = EconomyScale.tokens(1_000_000_000)
+    static let price = 400
 
     /// 상점에서 파는 알 — 보증 없음(기본) → 고급 이상 → 희귀 이상. `nil` = 등급 보증 없는 기존 알.
     /// **전설 전용 알은 팔지 않는다**(등급 하한을 capture_rate 로 표현할 수 없고, 최고 등급을 확정
@@ -577,9 +572,17 @@ struct CompanionState: Codable, Sendable {
     var timeOpenAwardDay = ""
     var timeOpenAwardedToday = 0
     /// Linear issue IDs already credited (account ledger — merge on save import).
+    /// Migrated into `creditedWorkKeys` as `linear:` keys on decode.
     var linearCreditedIssueIDs: [String] = []
     /// First successful Linear poll seeds IDs without XP (no backfill dump).
     var linearIntegrationSeeded = false
+    /// Shop wallet (coins from tasks / time). Not converted from historical tokens.
+    var coinsEarned = 0
+    var coinsSpent = 0
+    /// Namespaced completion keys (`source:remoteID`). Account ledger — merge on import.
+    var creditedWorkKeys: [String] = []
+    /// First successful work poll seeds keys without pay (no backfill dump).
+    var workLedgerSeeded = false
 
     init() {}
 
@@ -620,6 +623,12 @@ struct CompanionState: Codable, Sendable {
         timeOpenAwardedToday = c.lenient(Int.self, forKey: .timeOpenAwardedToday, default: 0)
         linearCreditedIssueIDs = c.lenient([String].self, forKey: .linearCreditedIssueIDs, default: [])
         linearIntegrationSeeded = c.lenient(Bool.self, forKey: .linearIntegrationSeeded, default: false)
+        coinsEarned = c.lenient(Int.self, forKey: .coinsEarned, default: 0)
+        coinsSpent = c.lenient(Int.self, forKey: .coinsSpent, default: 0)
+        let storedKeys = c.lenient([String].self, forKey: .creditedWorkKeys, default: [])
+        creditedWorkKeys = CompletionLedger.merged(
+            storedKeys, CompletionLedger.migrateLegacyLinearIDs(linearCreditedIssueIDs))
+        workLedgerSeeded = c.lenient(Bool.self, forKey: .workLedgerSeeded, default: linearIntegrationSeeded)
     }
 
     /// 졸업 기록 또는 현재 개체가 실제로 도달한 단계에 이 종이 포함되는가.

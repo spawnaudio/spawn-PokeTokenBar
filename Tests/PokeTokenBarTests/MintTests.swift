@@ -24,7 +24,7 @@ final class MintTests: XCTestCase {
         let active = "{\"baseID\":1,\"pathIDs\":[1],\"stageIndex\":0,\"usedAtStage\":\(usedAtStage),"
             + "\"rarity\":\"common\",\"totalForms\":3,\"isShiny\":\(shiny)\(natureField)}"
         let inv = mint > 0 ? ",\"inventory\":{\"mint\":\(mint)}" : ""
-        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":\(used),\"spentTokens\":\(spent),"
+        let json = "{\"installBaselineSet\":true,\"usedSinceInstall\":\(used),\"coinsEarned\":\(used),\"coinsSpent\":\(spent),"
             + "\"lastDate\":\"d\",\"active\":\(active),\"dex\":[],\"collectedFinals\":[]\(inv)}"
         try? json.data(using: .utf8)!.write(to: url)
         return CompanionStore(provider: MintNoProvider(), clock: { self.now }, fileURL: url, rng: SeededRNG(seed: seed))
@@ -129,7 +129,7 @@ final class MintTests: XCTestCase {
 
     func testMintShopPriceAndPurchasable() {
         XCTAssertEqual(ItemKind.mint.shopPrice, Mint.price)
-        XCTAssertEqual(ItemKind.mint.shopPrice, EconomyScale.tokens(100_000_000))
+        XCTAssertEqual(Mint.price, 80)
         let s = store(mint: 0)
         XCTAssertTrue(s.purchasableItems.contains(.rareCandy))
         XCTAssertTrue(s.purchasableItems.contains(.mint))
@@ -140,7 +140,7 @@ final class MintTests: XCTestCase {
         XCTAssertTrue(s.canBuy(.mint))
         XCTAssertTrue(s.buy(.mint))
         XCTAssertEqual(s.itemCount(.mint), 1)
-        XCTAssertEqual(s.state.spentTokens, Mint.price)
+        XCTAssertEqual(s.state.coinsSpent, Mint.price)
         XCTAssertEqual(s.availableTokens, 300_000_000 - Mint.price)
     }
 

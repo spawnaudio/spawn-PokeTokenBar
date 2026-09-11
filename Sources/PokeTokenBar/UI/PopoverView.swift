@@ -55,6 +55,8 @@ struct PopoverView: View {
     @Environment(CompanionStore.self) private var companion
     @Environment(UpdateChecker.self) private var updater
     @Environment(PopoverNavigation.self) private var nav
+    @Environment(WorkHub.self) private var hub
+    @Environment(FocusTimer.self) private var timer
 
     private var l: L { companion.l }
 
@@ -125,19 +127,27 @@ struct PopoverView: View {
             } else if nav.tab == .shop {
                 ShopView(store: companion, nav: nav)
             } else if nav.tab == .linear {
-                LinearIntegrationView(store: store)
+                LinearIntegrationView(store: store, hub: hub, companion: companion)
             } else if nav.tab == .timeXP {
                 TimeXPView(store: store, companion: companion)
             } else {
                 CompanionHeader(store: companion)
-                Divider()
-                header
-                Divider()
-                providerStatusBanner   // 인시던트 있을 때만 — 한도 가용 여부와 무관(API 다운=한도 nil 케이스에도)
-                if selectedProviderHasLimits {
-                    limitsSection
-                    Divider()
+                RewardToastView(companion: companion)
+                HStack {
+                    Text(l.spendableTokens)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("\(companion.availableCoins)")
+                        .font(.title2.weight(.bold))
+                        .monospacedDigit()
+                    Spacer()
+                    Text(l.completedTodayCount(hub.completedTodayCount))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                Divider()
+                WorkInboxView(hub: hub, companion: companion, timer: timer, compact: true)
+                    .frame(height: 280)
             }
             footer
         }
@@ -770,6 +780,13 @@ struct PopoverView: View {
                 }
             }
             Spacer()
+            Button {
+                NotificationCenter.default.post(name: .ptbOpenMainWindow, object: nil)
+            } label: {
+                Image(systemName: "macwindow")
+            }
+            .buttonStyle(.borderless)
+            .help(l.openMainWindow)
             Button {
                 nav.showSettings = true
             } label: {
