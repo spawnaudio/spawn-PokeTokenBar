@@ -20,7 +20,7 @@ struct SessionIslandView: View {
                 } else if session.resetPrompt {
                     FocusResetConfirmCard()
                         .frame(width: FloatingPetController.islandWidth)
-                } else {
+                } else if SessionPromptSurface.showsOnOverlay(floatingPetEnabled: store.floatingPetEnabled) {
                     SessionPromptCard()
                         .frame(width: FloatingPetController.islandWidth)
                 }

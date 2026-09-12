@@ -44,7 +44,7 @@ final class UsageStore {
     /// Transient speech bubble on the floating pet (limit warnings and Linear completions).
     private(set) var currentSpeechBubble: SpeechBubble?
     private var currentBubbleDate: Date = .distantPast
-    /// Temporary menubar override (Linear completion flash). Empty = normal usage lines.
+    /// Temporary menubar override (Linear completion, pet-off times-up / forfeit). Empty = normal usage lines.
     private(set) var menuFlashLines: [String] = []
 
     // MARK: 설정 (UserDefaults)
@@ -254,6 +254,7 @@ final class UsageStore {
     /// - **활성 항목 2개 이하 → 각 항목을 개별 세로 줄로**(토큰/비용/한도 각 1줄).
     /// - **3개(토큰+비용+한도) 모두 활성 → 토큰·비용을 한 줄로, 한도를 아랫줄로**(= 총 2줄).
     /// 한도 줄은 오늘 사용한 프로바이더만(`menuLimitLine`). 빈 배열이면 아이콘만.
+    /// 세션 카운트다운(펫 꺼짐)은 여기 넣지 않는다 — `MenuBarLines` 가 사용량 앞에 붙이고 ≤2줄을 지킨다.
     var menuLines: [String] {
         if !menuFlashLines.isEmpty { return menuFlashLines }
         guard lastUpdated != nil else { return ["—"] }
@@ -1416,6 +1417,11 @@ final class UsageStore {
         var menuLines: [String]
     }
 
+    struct SessionAlertFeedback: Equatable {
+        var bubble: SpeechBubble?
+        var menuLines: [String]?
+    }
+
     /// 알림 판정(순수·엣지 트리거) — 창별 utilization·임계값·직전 tier 상태로부터
     /// *임계값을 새로 넘어선 순간에만* 발화할 알림을 계산하고 tier 상태를 갱신한다.
     /// - 경고선 통과 1회 + 위험선 통과 1회만. 같은 tier 유지 중엔 재알림 없음(80·81·84… 억제).
@@ -1484,18 +1490,51 @@ final class UsageStore {
     }
 
     func announceTimesUp(_ identifier: String) {
-        let l = L(localizationLanguage)
-        presentTransientFeedback(
-            bubble: SpeechBubble(title: l.timesUpBubbleTitle(identifier), body: l.timesUpBubbleBody))
+        let feedback = Self.timesUpFeedback(
+            identifier: identifier,
+            floatingPetEnabled: floatingPetEnabled,
+            l: L(localizationLanguage))
+        presentTransientFeedback(bubble: feedback.bubble, menuLines: feedback.menuLines)
     }
 
     func announceForfeit(identifier: String, leaveInProgressXP: Int) {
-        let l = L(localizationLanguage)
-        presentTransientFeedback(
+        let feedback = Self.forfeitFeedback(
+            identifier: identifier,
+            leaveInProgressXP: leaveInProgressXP,
+            floatingPetEnabled: floatingPetEnabled,
+            l: L(localizationLanguage))
+        presentTransientFeedback(bubble: feedback.bubble, menuLines: feedback.menuLines)
+    }
+
+    /// Pet on: 6s overlay bubble. Pet off: menubar flash; the popover hosts the three-choice card.
+    static func timesUpFeedback(
+        identifier: String,
+        floatingPetEnabled: Bool,
+        l: L
+    ) -> SessionAlertFeedback {
+        if floatingPetEnabled {
+            return SessionAlertFeedback(
+                bubble: SpeechBubble(title: l.timesUpBubbleTitle(identifier), body: l.timesUpBubbleBody),
+                menuLines: nil)
+        }
+        return SessionAlertFeedback(
+            bubble: nil,
+            menuLines: [l.timesUpFlashTitle, identifier])
+    }
+
+    /// Always a critical bubble. Pet off also flashes the status item (Linear-completion style).
+    static func forfeitFeedback(
+        identifier: String,
+        leaveInProgressXP: Int,
+        floatingPetEnabled: Bool,
+        l: L
+    ) -> SessionAlertFeedback {
+        SessionAlertFeedback(
             bubble: SpeechBubble(
                 title: l.forfeitBubbleTitle(identifier),
                 body: l.forfeitBubbleBody(TokenFormatter.compact(leaveInProgressXP)),
-                isCritical: true))
+                isCritical: true),
+            menuLines: floatingPetEnabled ? nil : [l.forfeitFlashTitle, identifier])
     }
 
     /// Evolve / graduate copy on the floating pet. No-op when the pet or bubble alerts are off.

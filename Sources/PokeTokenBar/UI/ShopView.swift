@@ -225,9 +225,9 @@ private struct EggCard: View {
         }
     }
 
-    /// 리롤 실행 → 새 알을 볼 수 있게 Home 으로 전환(가방 사용과 동일 패턴).
+    /// 리롤 실행 → jump to Focus so the new egg is visible (same pattern as bag use).
     private func commit() {
         stage = .idle
-        if store.buyEgg(tier) { nav.tab = .home }
+        if store.buyEgg(tier) { nav.showFocus() }
     }
 }

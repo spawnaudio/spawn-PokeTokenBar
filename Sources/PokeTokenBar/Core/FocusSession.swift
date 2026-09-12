@@ -70,6 +70,54 @@ enum FocusClock {
     }
 }
 
+/// Where the 0:00 / check-in card is hosted. Overlay if the floating pet is on;
+/// popover if it is off. Today always keeps its copy.
+enum SessionPromptSurface {
+    static let showsOnToday = true
+
+    static func showsOnOverlay(floatingPetEnabled: Bool) -> Bool { floatingPetEnabled }
+
+    static func showsOnPopover(floatingPetEnabled: Bool) -> Bool { !floatingPetEnabled }
+
+    /// Pet-off forfeit (and other critical bubbles) when the three-choice / check-in card isn't up.
+    static func showsPopoverCaption(
+        floatingPetEnabled: Bool,
+        prompt: FocusPrompt,
+        bubbleIsCritical: Bool
+    ) -> Bool {
+        showsOnPopover(floatingPetEnabled: floatingPetEnabled)
+            && prompt == .none
+            && bubbleIsCritical
+    }
+}
+
+/// Status-item lines while a focus session is running and the floating pet (overlay clock) is off.
+/// Usage-only `UsageStore.menuLines` stay unchanged; AppDelegate prepends this clock and keeps ≤2 lines.
+enum MenuBarLines {
+    static func sessionClock(
+        session: FocusSession?,
+        floatingPetEnabled: Bool,
+        clock: (text: String, overtime: Bool),
+        overtimeAbbrev: String
+    ) -> String? {
+        guard session != nil, !floatingPetEnabled else { return nil }
+        return clock.overtime ? "\(clock.text) \(overtimeAbbrev)" : clock.text
+    }
+
+    /// Session clock is the first line. Extra usage items collapse onto a second line — never 3+.
+    static func compose(usageLines: [String], sessionClock: String?) -> [String] {
+        guard let sessionClock else { return usageLines }
+        if usageLines.isEmpty { return [sessionClock] }
+        if usageLines.count == 1 { return [sessionClock, usageLines[0]] }
+        return [sessionClock, usageLines.joined(separator: " · ")]
+    }
+
+    static func toolTip(identifier: String?, sessionClock: String?) -> String? {
+        guard let identifier, let sessionClock else { return nil }
+        return "\(identifier) \(sessionClock)"
+    }
+}
+
 struct FocusPinnedIssue: Codable, Equatable, Identifiable {
     var id: String
     var identifier: String
@@ -528,6 +576,9 @@ struct FocusLogEntry: Codable, Equatable, Identifiable {
     var xpDelta: Int? = nil
 
     enum Kind: String, Codable { case session, checkIn, note, forfeit }
+
+    /// Forfeit rows stay red in the Today log; other kinds use secondary text.
+    var usesDestructiveTint: Bool { kind == .forfeit }
 
     static func session(
         day: String,

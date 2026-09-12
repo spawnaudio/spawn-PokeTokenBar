@@ -131,10 +131,10 @@ private struct ItemCard: View {
         }
     }
 
-    /// 사용 → 항상 Home 탭으로 전환(진화/졸업 연출·"+XP"·성격 변경 토스트는 Home 의 CompanionHeader 에서 재생).
+    /// 사용 → always jump to Focus so CompanionHeader can play evolve/XP toasts.
     private func useNow() {
         confirming = false
         performUse()
-        nav.tab = .home
+        nav.showFocus()
     }
 }

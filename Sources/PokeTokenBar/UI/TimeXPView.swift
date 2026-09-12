@@ -4,6 +4,7 @@ import SwiftUI
 struct TimeXPView: View {
     let store: UsageStore
     let companion: CompanionStore
+    var compact: Bool = false
 
     private var l: L { companion.l }
 
@@ -27,19 +28,17 @@ struct TimeXPView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            ProgressView(
+            MutedProgressBar(
                 value: Double(companion.state.timeOpenAwardedToday),
                 total: Double(TimeOpenXP.dailyCap))
-            .tint(.orange)
-            .controlSize(.small)
 
             infoRow(label: l.timeXPTodayAwarded, value: TokenFormatter.compact(companion.state.timeOpenAwardedToday))
             infoRow(label: l.timeXPDailyCap, value: TokenFormatter.compact(TimeOpenXP.dailyCap))
             nextAwardRow(enabled: store.timeOpenXPEnabled, lastAwardAt: companion.state.lastTimeOpenAwardAt)
 
-            Spacer(minLength: 0)
+            if !compact { Spacer(minLength: 0) }
         }
-        .frame(height: 520)
+        .frame(height: compact ? nil : 520)
     }
 
     private func infoRow(label: String, value: String) -> some View {

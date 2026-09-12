@@ -58,6 +58,31 @@ struct LinearIssueStatusPicker: View {
     }
 }
 
+/// Linear workflow tint for the 8pt status dot (popover rows + Today pin list / inspector).
+enum LinearWorkflowTint {
+    static func color(for type: String?) -> Color {
+        switch (type ?? "").lowercased() {
+        case "completed": return .green
+        case "started": return .yellow
+        case "canceled", "cancelled": return .secondary
+        default: return .blue
+        }
+    }
+}
+
+@MainActor
+struct LinearStatusDot: View {
+    var type: String?
+    var size: CGFloat = 8
+
+    var body: some View {
+        Circle()
+            .fill(LinearWorkflowTint.color(for: type))
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
 @MainActor
 struct LinearIssueIDButton: View {
     let identifier: String
@@ -192,6 +217,9 @@ struct LinearIssueCompletionStats: View {
 struct LinearFocusButton: View {
     let issue: LinearIssueSummary
     var compact: Bool = true
+    /// Today desk keeps the default (open Today). Linear tab passes false.
+    var openDeskOnPin: Bool = true
+    var onPinned: (() -> Void)? = nil
 
     @Environment(FocusSessionStore.self) private var session
     @Environment(CompanionStore.self) private var companion
@@ -201,7 +229,8 @@ struct LinearFocusButton: View {
 
     var body: some View {
         Button {
-            session.pin(issue)
+            session.pin(issue, openDesk: openDeskOnPin)
+            onPinned?()
         } label: {
             Text(isPinned ? l.focusingNow : l.focusAction)
         }
@@ -214,6 +243,7 @@ struct LinearFocusButton: View {
 @MainActor
 struct NewLinearIssueButton: View {
     var compact: Bool = true
+    var showsTitle: Bool = false
 
     @Environment(UsageStore.self) private var store
     @Environment(FocusSessionStore.self) private var session
@@ -225,7 +255,11 @@ struct NewLinearIssueButton: View {
         Button {
             session.openComposer()
         } label: {
-            Image(systemName: "plus")
+            if showsTitle {
+                Label(l.newLinearIssue, systemImage: "plus")
+            } else {
+                Image(systemName: "plus")
+            }
         }
         .buttonStyle(.borderless)
         .controlSize(compact ? .mini : .small)

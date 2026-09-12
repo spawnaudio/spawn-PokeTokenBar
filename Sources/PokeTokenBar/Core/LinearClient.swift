@@ -62,6 +62,57 @@ struct LinearIssueSummary: Equatable, Sendable, Identifiable {
     var descriptionText: String?
 }
 
+/// Fields the Today inspector (and tests) show from an already-fetched issue. Empty values are omitted.
+enum LinearIssueInspector {
+    enum Kind: Equatable {
+        case status, team, project, assignee, labels, estimate, due
+    }
+
+    struct Field: Equatable {
+        var kind: Kind
+        var value: String
+        var stateType: String? = nil
+    }
+
+    static func fields(
+        for issue: LinearIssueSummary,
+        dueText: (Date) -> String = { $0.formatted(.dateTime.month(.abbreviated).day()) }
+    ) -> [Field] {
+        var rows: [Field] = []
+        if let name = issue.stateName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            rows.append(Field(kind: .status, value: name, stateType: issue.stateType))
+        }
+        if let team = teamLabel(issue) {
+            rows.append(Field(kind: .team, value: team))
+        }
+        if let project = issue.projectName?.trimmingCharacters(in: .whitespacesAndNewlines), !project.isEmpty {
+            rows.append(Field(kind: .project, value: project))
+        }
+        if let assignee = issue.assigneeName?.trimmingCharacters(in: .whitespacesAndNewlines), !assignee.isEmpty {
+            rows.append(Field(kind: .assignee, value: assignee))
+        }
+        if !issue.labelNames.isEmpty {
+            rows.append(Field(kind: .labels, value: issue.labelNames.joined(separator: ", ")))
+        }
+        if let estimate = issue.estimate {
+            rows.append(Field(kind: .estimate, value: String(estimate)))
+        }
+        if let due = issue.dueDate {
+            rows.append(Field(kind: .due, value: dueText(due)))
+        }
+        return rows
+    }
+
+    private static func teamLabel(_ issue: LinearIssueSummary) -> String? {
+        let key = issue.teamKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let name = issue.teamName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !key.isEmpty, !name.isEmpty, key != name { return "\(key) · \(name)" }
+        if !key.isEmpty { return key }
+        if !name.isEmpty { return name }
+        return nil
+    }
+}
+
 struct LinearProjectSummary: Equatable, Sendable, Identifiable {
     var id: String
     var name: String

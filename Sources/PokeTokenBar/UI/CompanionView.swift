@@ -726,13 +726,13 @@ struct DexSummaryHeader: View {
     }
 }
 
-/// 컬렉션 탭 — 도감과 포획 로그를 하위 세그먼트로 전환한다.
+/// Collection tab — Dex and catch log as inner segments of Collection → Dex.
 ///
 /// 두 화면은 같은 데이터를 다른 축으로 본다:
 ///  - **도감**: 종 1개 = 1칸. 같은 라인을 여러 번 키워도 한 칸으로 접힌다(종 정보만).
 ///  - **로그**: 개체 1마리 = 1행. 같은 라인이 여러 행으로 나오는 게 정상 — 성격·획득 시각처럼
 ///    개체에 딸린 정보는 여기에만 있다.
-/// 상위 탭(PopoverTab)은 그대로 4개 — 세그먼트 폭(332/2)이 넉넉해 탭바를 늘릴 필요가 없다.
+/// Bag and Shop are sibling Collection segments, not extra root tabs.
 @MainActor
 struct CollectionView: View {
     let store: CompanionStore
