@@ -83,7 +83,7 @@ struct FocusTabView: View {
                 } label: {
                     Label(l.linearOpenIssue, systemImage: "arrow.up.right.square")
                 }
-                .buttonStyle(.bordered)
+                .tahoeButtonStyle(.regular)
                 .controlSize(.small)
             }
             LinearIssueStatusPicker(issue: issue, compact: false)
@@ -99,9 +99,9 @@ struct FocusTabView: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Button(l.openLinearTab) { nav.tab = .linear }
-                    .buttonStyle(.borderedProminent)
+                    .tahoeButtonStyle(.prominent)
                 Button(l.todayDeskMenuOpen) { session.openDesk() }
-                    .buttonStyle(.bordered)
+                    .tahoeButtonStyle(.regular)
             }
             .controlSize(.regular)
         }

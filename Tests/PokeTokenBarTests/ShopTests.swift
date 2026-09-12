@@ -183,6 +183,8 @@ final class ShopTests: XCTestCase {
                         .egg(.uncommon),     // 2.5B
                         .item(.shinyCharm),  // 3B
                         .egg(.rare)])        // 4B
+        let prices = s.shopEntries.map(\.price)
+        XCTAssertEqual(prices, prices.sorted(), "가격 상수가 바뀌어도 오름차순 불변식 유지")
         for tier in FreshEgg.shopTiers {
             XCTAssertTrue(s.shopEntries.contains(.egg(tier)), "알 상태에서도 \(tier?.rawValue ?? "기본") 알은 노출 유지")
             XCTAssertFalse(s.canBuyEgg(tier), "노출은 되지만 \(tier?.rawValue ?? "기본") 알 구매는 hasActive 게이트로 차단")

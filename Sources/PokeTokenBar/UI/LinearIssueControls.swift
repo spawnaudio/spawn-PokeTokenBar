@@ -98,12 +98,9 @@ struct LinearIssueIDButton: View {
         } label: {
             Text(identifier)
                 .font(style)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 2)
-                .background(Color.accentColor.opacity(0.15))
-                .clipShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .tahoeButtonStyle(.regular)
+        .controlSize(.mini)
         .disabled(url == nil)
         .help(companion.l.linearOpenIssue)
     }
@@ -234,7 +231,7 @@ struct LinearFocusButton: View {
         } label: {
             Text(isPinned ? l.focusingNow : l.focusAction)
         }
-        .buttonStyle(.bordered)
+        .tahoeButtonStyle(.regular)
         .controlSize(compact ? .mini : .small)
         .tint(isPinned ? .accentColor : .secondary)
     }
@@ -261,7 +258,8 @@ struct NewLinearIssueButton: View {
                 Image(systemName: "plus")
             }
         }
-        .buttonStyle(.borderless)
+        .tahoeButtonStyle(showsTitle ? .regular : .accessory)
+        .buttonBorderShape(showsTitle ? .capsule : .circle)
         .controlSize(compact ? .mini : .small)
         .disabled(!store.canComposeLinearIssue)
         .help(store.canComposeLinearIssue ? l.newLinearIssue : l.linearIssuesNeedsSetup)
@@ -291,18 +289,18 @@ struct FocusForfeitWarningCard: View {
                 .font(.caption)
             HStack {
                 Button(l.cancel) { session.cancelForfeit() }
+                    .tahoeButtonStyle(.regular)
                 Button(l.forfeitConfirmAction) {
                     Task { await session.confirmForfeit() }
                 }
-                .buttonStyle(.borderedProminent)
+                .tahoeButtonStyle(.prominent)
                 .tint(.red)
             }
         }
         .controlSize(.small)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .tahoePromptChrome()
     }
 }
 
@@ -323,15 +321,15 @@ struct FocusResetConfirmCard: View {
                 .foregroundStyle(.secondary)
             HStack {
                 Button(l.cancel) { session.cancelReset() }
+                    .tahoeButtonStyle(.regular)
                 Button(l.resetTimer) { session.confirmReset() }
-                    .buttonStyle(.borderedProminent)
+                    .tahoeButtonStyle(.prominent)
             }
         }
         .controlSize(.small)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .tahoePromptChrome()
     }
 }
 
@@ -362,7 +360,7 @@ struct FocusTimerControls: View {
             Button(l.unfocusAction) { session.requestUnfocus() }
                 .foregroundStyle(.red)
         }
-        .buttonStyle(.bordered)
+        .tahoeButtonStyle(.regular)
         .controlSize(compact ? .mini : .small)
     }
 }

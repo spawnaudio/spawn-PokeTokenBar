@@ -10,9 +10,6 @@ struct TodayUsageSummary: View {
     var onTap: (() -> Void)? = nil
 
     private var l: L { companion.l }
-    private var todayCost: Double {
-        store.costingSnapshots.reduce(0) { $0 + ($1.today?.totalCost ?? 0) }
-    }
     private var weekTokens: Int { store.weekTotalTokens }
 
     var body: some View {
@@ -30,7 +27,7 @@ struct TodayUsageSummary: View {
                 }
                 Spacer()
                 if store.showsCost {
-                    Text(TokenFormatter.cost(todayCost))
+                    UsageCostText(cost: store.todayUsageCost, l: l)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -113,7 +110,9 @@ struct UsageTabView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(.borderless)
+                .tahoeButtonStyle(.accessory)
+                .buttonBorderShape(.circle)
+                .controlSize(.small)
                 .help(l.refreshNow)
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -126,7 +125,7 @@ struct UsageTabView: View {
                     .monospacedDigit()
                 Spacer()
                 if store.showsCost {
-                    Text(TokenFormatter.cost(store.costingSnapshots.reduce(0) { $0 + ($1.today?.totalCost ?? 0) }))
+                    UsageCostText(cost: store.todayUsageCost, l: l)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -143,11 +142,15 @@ struct UsageTabView: View {
             }
             if store.weekTotalTokens > 0 || store.monthTotalTokens > 0 {
                 HStack(spacing: 14) {
-                    periodLabel(l.thisWeek, tokens: store.weekTotalTokens, cost: store.showsCost ? store.weekCostTotal : nil)
-                    periodLabel(l.thisMonth, tokens: store.monthTotalTokens, cost: store.showsCost ? store.monthCostTotal : nil)
+                    periodLabel(l.thisWeek, tokens: store.weekTotalTokens, cost: store.showsCost ? store.weekUsageCost : nil)
+                    periodLabel(l.thisMonth, tokens: store.monthTotalTokens, cost: store.showsCost ? store.monthUsageCost : nil)
                     Spacer()
                 }
             }
+            MonthDailyTrend(series: store.monthDailyTotals,
+                            showsCost: store.showsCost,
+                            today: LocalUsageReader.todayKey(),
+                            l: l)
             if store.snapshots.count > 1 {
                 ProviderTabBar(
                     snapshots: store.snapshots,
@@ -165,7 +168,7 @@ struct UsageTabView: View {
         store.snapshot(preferring: nav.providerID)
     }
 
-    private func periodLabel(_ name: String, tokens: Int, cost: Double?) -> some View {
+    private func periodLabel(_ name: String, tokens: Int, cost: UsageCost?) -> some View {
         HStack(spacing: 4) {
             Text(name)
                 .font(.caption)
@@ -174,7 +177,7 @@ struct UsageTabView: View {
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
             if let cost {
-                Text(TokenFormatter.cost(cost))
+                UsageCostText(cost: cost, l: l)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -191,16 +194,16 @@ struct UsageTabView: View {
                     .font(.callout)
                     .monospacedDigit()
                 if snapshot.reportsCost {
-                    Text(TokenFormatter.cost(today.totalCost))
+                    UsageCostText(cost: today.usageCost, l: l)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             HStack(spacing: 10) {
-                tokenTypeLabel("in", today.inputTokens)
-                tokenTypeLabel("out", today.outputTokens)
-                tokenTypeLabel("cache w", today.cacheCreationTokens)
-                tokenTypeLabel("cache r", today.cacheReadTokens)
+                tokenTypeLabel(l.tokenInput, today.inputTokens)
+                tokenTypeLabel(l.tokenOutput, today.outputTokens)
+                tokenTypeLabel(l.tokenCacheWrite, today.cacheCreationTokens)
+                tokenTypeLabel(l.tokenCacheRead, today.cacheReadTokens)
             }
             if let models = today.models, models.count > 1 {
                 ForEach(models.sorted(by: { $0.value > $1.value }), id: \.key) { model, tokens in
@@ -378,26 +381,7 @@ struct UsageTabView: View {
     @ViewBuilder
     private func antigravityBucketRow(_ bucket: AntigravityQuotaBucket) -> some View {
         let name = l.antigravityWindow(window: bucket.window, bucketId: bucket.bucketId)
-        let utilization = bucket.usedPercent
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(name)
-                    .font(.callout)
-                Spacer()
-                Text(limitPercentText(utilization))
-                    .font(.callout)
-                    .monospacedDigit()
-                    .foregroundStyle(limitColor(utilization))
-                if let reset = bucket.resetDate {
-                    Text("· \(reset, style: .relative)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            ProgressView(value: min(utilization, 100), total: 100)
-                .tint(limitColor(utilization))
-                .controlSize(.small)
-        }
+        quotaRow(name: name, utilization: bucket.usedPercent, reset: bucket.resetDate)
     }
 
     @ViewBuilder
@@ -420,6 +404,7 @@ struct UsageTabView: View {
                     Text(l.refresh)
                 }
             }
+            .tahoeButtonStyle(.regular)
             .controlSize(.small)
             .disabled(store.isRefreshingAntigravityLimits)
         }
@@ -440,7 +425,7 @@ struct UsageTabView: View {
             Button(l.retry) {
                 Task { await store.refreshAntigravityLimitsFromKeychain() }
             }
-            .buttonStyle(.borderedProminent)
+            .tahoeButtonStyle(.prominent)
             .controlSize(.mini)
             .padding(.top, 2)
         }
@@ -454,28 +439,52 @@ struct UsageTabView: View {
         return store.limitDisplayMode == .remaining ? l.percentRemaining(text) : text
     }
 
+    private static let resetClockWindow: TimeInterval = 6 * 3600
+
+    private func resetClockSuffix(_ reset: Date) -> Text {
+        let f = DateFormatter()
+        f.locale = companion.language.displayLocale
+        let nearby = Calendar.current.isDateInToday(reset)
+            || reset.timeIntervalSinceNow <= Self.resetClockWindow
+        f.setLocalizedDateFormatFromTemplate(nearby ? "HHmm" : "EEEEdHHmm")
+        return Text(" (\(f.string(from: reset)))")
+    }
+
+    private func resetLabel(_ reset: Date) -> Text {
+        Text("\(reset, style: .relative)") + resetClockSuffix(reset)
+    }
+
     @ViewBuilder
     private func limitRow(name: String, window: LimitWindow?) -> some View {
         if let window, let utilization = window.utilization {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(name)
-                        .font(.callout)
-                    Spacer()
-                    Text(limitPercentText(utilization))
-                        .font(.callout)
+            quotaRow(name: name, utilization: utilization, reset: window.resetDate)
+        }
+    }
+
+    /// All quota types share the same trailing percentage alignment.
+    private func quotaRow(name: String, utilization: Double, reset: Date?,
+                          detail: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(name).font(.callout)
+                Spacer()
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
                         .monospacedDigit()
-                        .foregroundStyle(limitColor(utilization))
-                    if let reset = window.resetDate {
-                        Text("· \(reset, style: .relative)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
+                        .foregroundStyle(.secondary)
                 }
-                ProgressView(value: min(utilization, 100), total: 100)
-                    .tint(limitColor(utilization))
-                    .controlSize(.small)
+                if let reset {
+                    resetLabel(reset)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                Text(limitPercentText(utilization))
+                    .font(.callout)
+                    .monospacedDigit()
+                    .foregroundStyle(limitColor(utilization))
             }
+            LimitProgressBar(usedPercent: utilization, tint: limitColor(utilization))
         }
     }
 
@@ -512,6 +521,7 @@ struct UsageTabView: View {
                     .font(.caption).fontWeight(.semibold)
                 Spacer()
                 Button(l.settings) { nav.openSessionKeySettings() }
+                    .tahoeButtonStyle(.regular)
                     .controlSize(.small)
             }
             Text(l.sessionKeyExpiredNoticeHint)
@@ -539,6 +549,7 @@ struct UsageTabView: View {
                         Text(l.retry)
                     }
                 }
+                .tahoeButtonStyle(.prominent)
                 .controlSize(.small)
                 .disabled(store.isRefreshingLimitToken)
             }
@@ -569,6 +580,7 @@ struct UsageTabView: View {
                     Text(l.refresh)
                 }
             }
+            .tahoeButtonStyle(.regular)
             .controlSize(.small)
             .disabled(store.isRefreshingLimitToken)
         }
@@ -586,54 +598,17 @@ struct UsageTabView: View {
     @ViewBuilder
     private func codexLimitRow(name: String, window: CodexRateLimitWindow?) -> some View {
         if let window {
-            let utilization = Double(window.usedPercent)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(name)
-                        .font(.callout)
-                    Spacer()
-                    Text(limitPercentText(utilization))
-                        .font(.callout)
-                        .monospacedDigit()
-                        .foregroundStyle(limitColor(utilization))
-                    if let reset = window.resetDate {
-                        Text("· \(reset, style: .relative)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                ProgressView(value: min(utilization, 100), total: 100)
-                    .tint(limitColor(utilization))
-                    .controlSize(.small)
-            }
+            quotaRow(name: name, utilization: Double(window.usedPercent), reset: window.resetDate)
         }
     }
 
     @ViewBuilder
     private func codexSpendLimitRow(_ limit: CodexSpendControlLimit?) -> some View {
         if let limit {
-            let utilization = Double(limit.usedPercent)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(l.personalSpendLimit)
-                        .font(.callout)
-                    Spacer()
-                    Text("\(limit.used) / \(limit.limit)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                    Text(limitPercentText(utilization))
-                        .font(.callout)
-                        .monospacedDigit()
-                        .foregroundStyle(limitColor(utilization))
-                    Text("· \(limit.resetDate, style: .relative)")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                ProgressView(value: min(utilization, 100), total: 100)
-                    .tint(limitColor(utilization))
-                    .controlSize(.small)
-            }
+            quotaRow(name: l.personalSpendLimit,
+                     utilization: Double(limit.usedPercent),
+                     reset: limit.resetDate,
+                     detail: "\(limit.used) / \(limit.limit)")
         }
     }
 
@@ -676,24 +651,36 @@ struct ProviderTabBar: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(snapshots) { snap in
-                    let isSelected = snap.providerID == selectedID
-                    Button { onSelect(snap.providerID) } label: {
-                        Text(snap.displayName)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .font(.caption.weight(isSelected ? .semibold : .regular))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                            .clipShape(Capsule())
+            TahoeGlassCluster(spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(snapshots) { snap in
+                        let isSelected = snap.providerID == selectedID
+                        Button { onSelect(snap.providerID) } label: {
+                            Text(snap.displayName)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .font(.caption.weight(isSelected ? .semibold : .regular))
+                        }
+                        .controlSize(.small)
+                        .tahoeButtonStyle(isSelected ? .prominent : .regular)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+    }
+}
+
+/// Text and fill describe the same quantity; warning colors still represent actual usage.
+@MainActor
+struct LimitProgressBar: View {
+    let usedPercent: Double
+    let tint: Color
+    @Environment(UsageStore.self) private var store
+
+    var body: some View {
+        ProgressView(value: min(100, max(0, store.limitDisplayPercent(usedPercent))), total: 100)
+            .tint(tint)
+            .controlSize(.small)
     }
 }

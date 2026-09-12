@@ -34,6 +34,29 @@ struct PopoverCardModifier: ViewModifier {
     }
 }
 
+/// Primary / secondary / toolbar buttons. macOS 26+ uses Liquid Glass; older
+/// macOS keeps bordered / borderless so the popover still reads as a control.
+enum TahoeButtonKind {
+    case prominent
+    case regular
+    case accessory
+}
+
+/// Morphing glass cluster. Older macOS just lays out the children.
+@MainActor
+struct TahoeGlassCluster<Content: View>: View {
+    var spacing: CGFloat = 8
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if #available(macOS 26, *) {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+    }
+}
+
 extension View {
     func popoverCard() -> some View {
         modifier(PopoverCardModifier())
@@ -46,6 +69,49 @@ extension View {
             self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         } else {
             self.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
+    /// `.glass` / `.glassProminent` on Tahoe; bordered or borderless below macOS 26.
+    @ViewBuilder
+    func tahoeButtonStyle(_ kind: TahoeButtonKind) -> some View {
+        if #available(macOS 26, *) {
+            switch kind {
+            case .prominent:
+                self.buttonStyle(.glassProminent)
+            case .regular, .accessory:
+                self.buttonStyle(.glass)
+            }
+        } else {
+            switch kind {
+            case .prominent:
+                self.buttonStyle(.borderedProminent)
+            case .regular:
+                self.buttonStyle(.bordered)
+            case .accessory:
+                self.buttonStyle(.borderless)
+            }
+        }
+    }
+
+    /// Overlay island / prompt chrome: glass on Tahoe, opaque window fill elsewhere.
+    @ViewBuilder
+    func tahoeFloatingChrome(cornerRadius: CGFloat = 12) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(Color(nsColor: .windowBackgroundColor).opacity(0.95), in: shape)
+        }
+    }
+
+    @ViewBuilder
+    func tahoePromptChrome(cornerRadius: CGFloat = 10) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(Color(nsColor: .windowBackgroundColor), in: shape)
         }
     }
 }
@@ -92,21 +158,14 @@ struct FocusPauseButton: View {
     let action: () -> Void
 
     var body: some View {
-        let label = Label(paused ? resumeTitle : pauseTitle,
-                          systemImage: paused ? "play.fill" : "pause.fill")
-        if #available(macOS 26, *) {
-            Button(action: action) { label }
-                .buttonStyle(.glassProminent)
-                .controlSize(.regular)
-                .disabled(disabled)
-                .help(paused ? resumeTitle : pauseTitle)
-        } else {
-            Button(action: action) { label }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(disabled)
-                .help(paused ? resumeTitle : pauseTitle)
+        Button(action: action) {
+            Label(paused ? resumeTitle : pauseTitle,
+                  systemImage: paused ? "play.fill" : "pause.fill")
         }
+        .tahoeButtonStyle(.prominent)
+        .controlSize(.regular)
+        .disabled(disabled)
+        .help(paused ? resumeTitle : pauseTitle)
     }
 }
 
@@ -118,17 +177,10 @@ struct FocusMarkDoneButton: View {
     let action: () -> Void
 
     var body: some View {
-        if #available(macOS 26, *) {
-            Button(title, action: action)
-                .buttonStyle(.glassProminent)
-                .controlSize(.regular)
-                .disabled(disabled)
-        } else {
-            Button(title, action: action)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(disabled)
-        }
+        Button(title, action: action)
+            .tahoeButtonStyle(.prominent)
+            .controlSize(.regular)
+            .disabled(disabled)
     }
 }
 
@@ -142,53 +194,51 @@ struct PopoverBottomBar: View {
 
     var body: some View {
         @Bindable var nav = nav
-        HStack(spacing: 2) {
-            ForEach(PopoverTab.allCases, id: \.self) { tab in
-                Button {
-                    nav.tab = tab
-                } label: {
-                    VStack(spacing: 2) {
-                        Image(systemName: tab.symbol)
-                            .font(.body)
-                            .symbolVariant(nav.tab == tab ? .fill : .none)
-                        Text(tab.title(l))
-                            .font(.caption2)
+        TahoeGlassCluster(spacing: 8) {
+            HStack(spacing: 8) {
+                HStack(spacing: 2) {
+                    ForEach(PopoverTab.allCases, id: \.self) { tab in
+                        Button {
+                            nav.tab = tab
+                        } label: {
+                            VStack(spacing: 2) {
+                                Image(systemName: tab.symbol)
+                                    .font(.body)
+                                    .symbolVariant(nav.tab == tab ? .fill : .none)
+                                Text(tab.title(l))
+                                    .font(.caption2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .foregroundStyle(nav.tab == tab ? Color.accentColor : Color.secondary)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(tab.title(l))
+                        .accessibilityAddTraits(nav.tab == tab ? .isSelected : [])
                     }
-                    .frame(maxWidth: .infinity)
-                    .foregroundStyle(nav.tab == tab ? Color.accentColor : Color.secondary)
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.title(l))
-                .accessibilityAddTraits(nav.tab == tab ? .isSelected : [])
-            }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .popoverBottomBarChrome()
 
-            Divider()
-                .frame(height: 28)
-                .padding(.horizontal, 4)
-
-            iconButton(systemName: "calendar", help: l.todayDeskMenuOpen, label: l.todayDeskWindowTitle) {
-                session.openDesk()
-            }
-            iconButton(systemName: "gearshape", help: l.settings, label: l.settings) {
-                nav.showSettings = true
+                iconButton(systemName: "calendar", help: l.todayDeskMenuOpen, label: l.todayDeskWindowTitle) {
+                    session.openDesk()
+                }
+                iconButton(systemName: "gearshape", help: l.settings, label: l.settings) {
+                    nav.showSettings = true
+                }
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
-        .popoverBottomBarChrome()
     }
 
     private func iconButton(systemName: String, help: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 36)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .tahoeButtonStyle(.accessory)
+        .buttonBorderShape(.circle)
+        .controlSize(.regular)
         .help(help)
         .accessibilityLabel(label)
     }

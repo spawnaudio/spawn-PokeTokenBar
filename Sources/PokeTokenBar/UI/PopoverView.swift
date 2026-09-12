@@ -130,14 +130,14 @@ struct PopoverView: View {
                     ProgressView().controlSize(.small)
                 } else {
                     Button(l.updateButton) { updater.applyUpdate() }
-                        .buttonStyle(.borderedProminent).controlSize(.small)
+                        .tahoeButtonStyle(.prominent).controlSize(.small)
                     Button(l.updateLater) { updater.skipCurrent() }
-                        .buttonStyle(.borderless).controlSize(.small).foregroundStyle(.secondary)
+                        .tahoeButtonStyle(.accessory).controlSize(.small).foregroundStyle(.secondary)
                 }
             }
             .padding(8)
             .background(Color.accentColor.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
