@@ -184,11 +184,12 @@ struct LinearIssueComposerView: View {
                 Button(l.createLinearIssue) {
                     Task { await submit(focus: false) }
                 }
+                .tahoeButtonStyle(.regular)
                 .disabled(!canSubmit)
                 Button(l.createAndFocusLinearIssue) {
                     Task { await submit(focus: true) }
                 }
-                .buttonStyle(.borderedProminent)
+                .tahoeButtonStyle(.prominent)
                 .disabled(!canSubmit)
             }
         }

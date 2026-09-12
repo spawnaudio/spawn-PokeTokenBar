@@ -110,7 +110,9 @@ struct UsageTabView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(.borderless)
+                .tahoeButtonStyle(.accessory)
+                .buttonBorderShape(.circle)
+                .controlSize(.small)
                 .help(l.refreshNow)
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -402,6 +404,7 @@ struct UsageTabView: View {
                     Text(l.refresh)
                 }
             }
+            .tahoeButtonStyle(.regular)
             .controlSize(.small)
             .disabled(store.isRefreshingAntigravityLimits)
         }
@@ -422,7 +425,7 @@ struct UsageTabView: View {
             Button(l.retry) {
                 Task { await store.refreshAntigravityLimitsFromKeychain() }
             }
-            .buttonStyle(.borderedProminent)
+            .tahoeButtonStyle(.prominent)
             .controlSize(.mini)
             .padding(.top, 2)
         }
@@ -518,6 +521,7 @@ struct UsageTabView: View {
                     .font(.caption).fontWeight(.semibold)
                 Spacer()
                 Button(l.settings) { nav.openSessionKeySettings() }
+                    .tahoeButtonStyle(.regular)
                     .controlSize(.small)
             }
             Text(l.sessionKeyExpiredNoticeHint)
@@ -545,6 +549,7 @@ struct UsageTabView: View {
                         Text(l.retry)
                     }
                 }
+                .tahoeButtonStyle(.prominent)
                 .controlSize(.small)
                 .disabled(store.isRefreshingLimitToken)
             }
@@ -575,6 +580,7 @@ struct UsageTabView: View {
                     Text(l.refresh)
                 }
             }
+            .tahoeButtonStyle(.regular)
             .controlSize(.small)
             .disabled(store.isRefreshingLimitToken)
         }
@@ -645,21 +651,19 @@ struct ProviderTabBar: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(snapshots) { snap in
-                    let isSelected = snap.providerID == selectedID
-                    Button { onSelect(snap.providerID) } label: {
-                        Text(snap.displayName)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                            .font(.caption.weight(isSelected ? .semibold : .regular))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                            .clipShape(Capsule())
+            TahoeGlassCluster(spacing: 6) {
+                HStack(spacing: 6) {
+                    ForEach(snapshots) { snap in
+                        let isSelected = snap.providerID == selectedID
+                        Button { onSelect(snap.providerID) } label: {
+                            Text(snap.displayName)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .font(.caption.weight(isSelected ? .semibold : .regular))
+                        }
+                        .controlSize(.small)
+                        .tahoeButtonStyle(isSelected ? .prominent : .regular)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

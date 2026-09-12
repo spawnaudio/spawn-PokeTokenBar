@@ -56,7 +56,8 @@ struct SessionIslandView: View {
                                 Image(systemName: current.userPaused || current.phase == .paused
                                       ? "play.fill" : "pause.fill")
                             }
-                            .buttonStyle(.borderless)
+                            .tahoeButtonStyle(.accessory)
+                            .buttonBorderShape(.circle)
                             .disabled(current.phase == .awaitingChoice)
                             .help(current.userPaused || current.phase == .paused ? l.resumeTimer : l.pauseTimer)
                             LinearIssueStatusPicker(issue: issue)
@@ -68,14 +69,12 @@ struct SessionIslandView: View {
                     }
                     .padding(8)
                     .frame(width: FloatingPetController.islandWidth, alignment: .leading)
-                    .background(Color(nsColor: .windowBackgroundColor).opacity(0.95))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .tahoeFloatingChrome()
                 } else if session.isComposingNote {
                     SessionNoteComposer()
                         .padding(8)
                         .frame(width: FloatingPetController.islandWidth, alignment: .leading)
-                        .background(Color(nsColor: .windowBackgroundColor).opacity(0.95))
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .tahoeFloatingChrome()
                 }
             }
         }
@@ -100,7 +99,8 @@ struct SessionNoteButton: View {
                 } label: {
                     Image(systemName: session.isComposingNote ? "text.bubble.fill" : "text.bubble")
                 }
-                .buttonStyle(.borderless)
+                .tahoeButtonStyle(.accessory)
+                .buttonBorderShape(.circle)
                 .controlSize(.mini)
             } else {
                 Button {
@@ -108,7 +108,7 @@ struct SessionNoteButton: View {
                 } label: {
                     Label(l.checkInAddNote, systemImage: session.isComposingNote ? "text.bubble.fill" : "text.bubble")
                 }
-                .buttonStyle(.bordered)
+                .tahoeButtonStyle(.regular)
                 .controlSize(.small)
             }
         }
@@ -141,7 +141,7 @@ struct SessionNoteComposer: View {
                 Button(l.postNote) {
                     Task { await session.postSessionNote() }
                 }
-                .buttonStyle(.borderedProminent)
+                .tahoeButtonStyle(.prominent)
                 .disabled(session.isPostingNote || trimmedEmpty)
             }
             if session.notePostFailed {

@@ -42,15 +42,16 @@ struct DifficultySettingsSection: View {
                 Divider()
                 row(l.difficultyShopLabel, value: $draft.shop)
             }
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8)
+            .background(Color(nsColor: .controlBackgroundColor),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 1))
             Text("10%–200% · " + l.difficultyHint).font(.caption2).foregroundStyle(.tertiary).padding(.leading, 4)
             if draft.differs(from: companion) {
                 HStack {
                     Spacer()
                     Button(l.save) { draft.save(to: companion) }
-                        .buttonStyle(.borderedProminent)
+                        .tahoeButtonStyle(.prominent)
                         .accessibilityIdentifier("saveDifficulty")
                 }
             }

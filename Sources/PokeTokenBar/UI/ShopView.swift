@@ -42,7 +42,7 @@ struct ShopView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -80,7 +80,7 @@ private struct ShopItemCard: View {
         }
         .padding(10)
         .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder
@@ -98,9 +98,9 @@ private struct ShopItemCard: View {
                     .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Button(l.buy) { buyNow() }
-                    .buttonStyle(.borderedProminent).controlSize(.small)
+                    .tahoeButtonStyle(.prominent).controlSize(.small)
                 Button(l.cancel) { confirming = false }
-                    .buttonStyle(.borderless).controlSize(.small)
+                    .tahoeButtonStyle(.accessory).controlSize(.small)
             }
         } else {
             HStack {
@@ -109,7 +109,7 @@ private struct ShopItemCard: View {
                 Spacer()
                 if store.canBuy(kind) {
                     Button(l.buy) { confirming = true }
-                        .buttonStyle(.bordered).controlSize(.small)
+                        .tahoeButtonStyle(.regular).controlSize(.small)
                 } else {
                     Text(l.notEnoughTokens)
                         .font(.caption2).foregroundStyle(.tertiary)
@@ -169,7 +169,7 @@ private struct EggCard: View {
         }
         .padding(10)
         .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder
@@ -185,10 +185,10 @@ private struct EggCard: View {
                         // 알 상태 — 리롤 대상이 없어 구매만 막는다(canBuyEgg 게이트). 항목을 숨기는 대신
                         // 비활성 버튼으로 "상점에 있긴 하다"를 보이고, 사유는 아래 한 줄로.
                         Button(l.buy) {}
-                            .buttonStyle(.bordered).controlSize(.small).disabled(true)
+                            .tahoeButtonStyle(.regular).controlSize(.small).disabled(true)
                     } else if store.canBuyEgg(tier) {
                         Button(l.buy) { stage = .confirm }
-                            .buttonStyle(.bordered).controlSize(.small)
+                            .tahoeButtonStyle(.regular).controlSize(.small)
                     } else {
                         Text(l.notEnoughTokens).font(.caption2).foregroundStyle(.tertiary)
                     }
@@ -208,9 +208,9 @@ private struct EggCard: View {
                 Button(l.buy) {
                     if store.currentIsShiny { stage = .shinyConfirm } else { commit() }
                 }
-                .buttonStyle(.borderedProminent).controlSize(.small)
+                .tahoeButtonStyle(.prominent).controlSize(.small)
                 Button(l.cancel) { stage = .idle }
-                    .buttonStyle(.borderless).controlSize(.small)
+                    .tahoeButtonStyle(.accessory).controlSize(.small)
             }
         case .shinyConfirm:
             HStack(spacing: 8) {
@@ -218,9 +218,9 @@ private struct EggCard: View {
                     .font(.caption2.weight(.semibold)).foregroundStyle(.orange).lineLimit(2)
                 Spacer()
                 Button(l.freshEggDiscardShiny) { commit() }
-                    .buttonStyle(.borderedProminent).controlSize(.small).tint(.orange)
+                    .tahoeButtonStyle(.prominent).controlSize(.small).tint(.orange)
                 Button(l.cancel) { stage = .idle }
-                    .buttonStyle(.borderless).controlSize(.small)
+                    .tahoeButtonStyle(.accessory).controlSize(.small)
             }
         }
     }

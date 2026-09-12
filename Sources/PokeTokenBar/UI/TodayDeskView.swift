@@ -168,7 +168,8 @@ struct TodayDeskView: View {
                 Image(systemName: "arrow.clockwise")
             }
         }
-        .buttonStyle(.borderless)
+        .tahoeButtonStyle(.accessory)
+        .buttonBorderShape(.circle)
         .help(l.refreshNow)
         .disabled(!store.linearIntegrationEnabled || !store.linearAPIKeyConfigured || store.isRefreshingLinearIssues)
         .accessibilityLabel(l.refreshNow)
@@ -359,7 +360,7 @@ struct TodayDeskView: View {
                     } label: {
                         Label(l.linearOpenIssue, systemImage: "arrow.up.right.square")
                     }
-                    .buttonStyle(.bordered)
+                    .tahoeButtonStyle(.regular)
                     .controlSize(.regular)
                 }
                 FocusMarkDoneButton(title: l.markDone, disabled: !canMarkDone) {
@@ -627,15 +628,16 @@ struct SessionPromptCard: View {
             Text(l.timesUpPopupTitle(id))
                 .font(.callout.weight(.semibold))
             Button(l.timesUpContinue) { session.continueOvertime() }
-                .buttonStyle(.borderedProminent)
+                .tahoeButtonStyle(.prominent)
             Button(l.timesUpFinishLeave) { session.finishLeavingInProgress() }
+                .tahoeButtonStyle(.regular)
             Button(l.timesUpMarkDone) { Task { await session.markIssueDone() } }
+                .tahoeButtonStyle(.regular)
         }
         .controlSize(.small)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.windowBackgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .tahoePromptChrome()
     }
 
     private var checkIn: some View {
@@ -649,9 +651,11 @@ struct SessionPromptCard: View {
                 .focused($checkInFieldFocused)
             HStack {
                 Button(l.checkInYes) { Task { await session.answerCheckIn(.yes) } }
-                    .buttonStyle(.borderedProminent)
+                    .tahoeButtonStyle(.prominent)
                 Button(l.checkInNo) { Task { await session.answerCheckIn(.no) } }
+                    .tahoeButtonStyle(.regular)
                 Button(l.checkInSkip) { Task { await session.answerCheckIn(.skip) } }
+                    .tahoeButtonStyle(.accessory)
                     .foregroundStyle(.secondary)
             }
             Text(l.checkInAddNote)
@@ -661,8 +665,7 @@ struct SessionPromptCard: View {
         .controlSize(.small)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.windowBackgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .tahoePromptChrome()
         .onAppear { checkInFieldFocused = true }
     }
 }

@@ -840,7 +840,8 @@ struct RepresentativeFooterButton: View {
         .labelStyle(.iconOnly)
         .help(title)
         .accessibilityLabel(title)
-        .buttonStyle(.bordered)
+        .tahoeButtonStyle(.regular)
+        .buttonBorderShape(.circle)
         .controlSize(.mini)
         .fixedSize()
     }
@@ -983,7 +984,7 @@ private struct PokemonDetailView: View {
                 Button(action: onBack) {
                     Label(store.l.back, systemImage: "chevron.left")
                 }
-                .buttonStyle(.borderless)
+                .tahoeButtonStyle(.accessory)
                 Spacer()
                 Text("#\(species.id)").font(.caption).foregroundStyle(.secondary)
             }
@@ -1003,6 +1004,8 @@ private struct PokemonDetailView: View {
                         VStack(spacing: 8) {
                             Text(store.l.pokemonDetailsUnavailable).foregroundStyle(.secondary)
                             Button(store.l.retry) { Task { await store.loadPokemonDetails(speciesID: species.id) } }
+                                .tahoeButtonStyle(.prominent)
+                                .controlSize(.small)
                         }
                         .frame(maxWidth: .infinity).padding(.vertical, 24)
                     } else {

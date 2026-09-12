@@ -106,19 +106,18 @@ struct SettingsView: View {
     private var header: some View {
         HStack(spacing: 6) {
             Button(action: onClose) {
-                HStack(spacing: 2) {
-                    Image(systemName: "chevron.backward")
-                    Text(l.back)
-                }
+                Label(l.back, systemImage: "chevron.backward")
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
+            .tahoeButtonStyle(.accessory)
+            .controlSize(.small)
             .keyboardShortcut(.cancelAction)
             Spacer()
             Text(l.settings).font(.headline)
             Spacer()
-            // 좌측 뒤로 버튼과 시각적 균형 (제목 중앙 정렬 유지)
-            Text(l.back).opacity(0).accessibilityHidden(true)
+            // Mirror the back control so the title stays optically centered.
+            Label(l.back, systemImage: "chevron.backward")
+                .opacity(0)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -138,7 +137,7 @@ struct SettingsView: View {
             Button(l.quit) {
                 NSApplication.shared.terminate(nil)
             }
-            .buttonStyle(.borderless)
+            .tahoeButtonStyle(.accessory)
         }
         .font(.caption2)
         .foregroundStyle(.tertiary)
@@ -181,6 +180,7 @@ struct SettingsView: View {
                 } label: {
                     Text(representativeSelectionText).lineLimit(1).truncationMode(.tail)
                 }
+                .tahoeButtonStyle(.regular)
                 .controlSize(.small)
                 .frame(width: 150, alignment: .trailing)
                 .layoutPriority(1)
@@ -366,6 +366,8 @@ struct SettingsView: View {
                         Text(l.checkNowButton)
                     }
                 }
+                .tahoeButtonStyle(.regular)
+                .controlSize(.small)
                 .disabled(isCheckingUpdate)
             }
             // 확인 결과 — 알림을 꺼둔 사용자도 여기서 새 버전을 알고 바로 적용할 수 있게 업데이트 버튼을 함께 노출.
@@ -375,7 +377,9 @@ struct SettingsView: View {
                     if let version = updater.available?.version {
                         Text(l.updateFound(version)).font(.caption).foregroundStyle(.orange)
                         Spacer()
-                        Button(l.updateButton) { updater.applyUpdate() }.controlSize(.small)
+                        Button(l.updateButton) { updater.applyUpdate() }
+                            .tahoeButtonStyle(.prominent)
+                            .controlSize(.small)
                     } else {
                         Text(l.upToDate(Self.appVersion)).font(.caption).foregroundStyle(.secondary)
                         Spacer()
@@ -398,6 +402,8 @@ struct SettingsView: View {
                 }
                 Spacer()
                 Button(l.exportSaveButton) { exportSave() }
+                    .tahoeButtonStyle(.regular)
+                    .controlSize(.small)
             }
             Divider()
             groupRow {
@@ -407,6 +413,8 @@ struct SettingsView: View {
                 }
                 Spacer()
                 Button(l.importSaveButton) { importSave(store) }
+                    .tahoeButtonStyle(.regular)
+                    .controlSize(.small)
             }
         }
     }
@@ -449,12 +457,16 @@ struct SettingsView: View {
                     Text(l.save)
                 }
             }
+            .tahoeButtonStyle(.prominent)
+            .controlSize(.small)
             .disabled(sessionKeyInput.isEmpty || store.isValidatingSessionKey)
             if store.sessionKeyConfigured {
                 Button(l.delete) {
                     sessionKeyInput = ""
                     store.clearSessionKey()
                 }
+                .tahoeButtonStyle(.regular)
+                .controlSize(.small)
             }
             Spacer()
         }
@@ -533,12 +545,16 @@ struct SettingsView: View {
                     if store.linearAPIKeyError == nil { linearAPIKeyInput = "" }
                 }
             }
+            .tahoeButtonStyle(.prominent)
+            .controlSize(.small)
             .disabled(linearAPIKeyInput.isEmpty || store.isValidatingLinearAPIKey)
             if store.linearAPIKeyConfigured {
                 Button(l.delete, role: .destructive) {
                     linearAPIKeyInput = ""
                     store.clearLinearAPIKey()
                 }
+                .tahoeButtonStyle(.regular)
+                .controlSize(.small)
             }
             if store.isValidatingLinearAPIKey {
                 ProgressView().controlSize(.small)
@@ -619,6 +635,8 @@ struct SettingsView: View {
                             Text(l.refreshLimitToken)
                         }
                     }
+                    .tahoeButtonStyle(.regular)
+                    .controlSize(.small)
                     .disabled(store.disableKeychainAccess || store.isRefreshingLimitToken)
                 }
                 if let limitTokenRefreshError = store.limitTokenRefreshError {
@@ -689,6 +707,8 @@ struct SettingsView: View {
                 }
                 Spacer()
                 Button(l.reportProblem) { reportProblem() }
+                    .tahoeButtonStyle(.regular)
+                    .controlSize(.small)
             }
             Divider()
             // 로그 파일 보기 — 문제 제보 시 바로 첨부할 수 있게 같은 그룹에 둔다(고급 접기 밖).
@@ -698,6 +718,8 @@ struct SettingsView: View {
                 Button("Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([AppLog.logFileURL])
                 }
+                .tahoeButtonStyle(.regular)
+                .controlSize(.small)
             }
             if reportFailed {
                 Text(l.reportMailFallback(SupportMail.address))
@@ -720,8 +742,8 @@ struct SettingsView: View {
                 .textCase(.uppercase).padding(.leading, 4)
             VStack(spacing: 0) { content() }
                 .background(Color(nsColor: .controlBackgroundColor),
-                           in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8)
+                           in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 1))
         }
     }

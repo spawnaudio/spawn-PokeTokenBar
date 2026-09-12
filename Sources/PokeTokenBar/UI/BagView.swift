@@ -68,7 +68,7 @@ private struct ItemCard: View {
         }
         .padding(10)
         .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     /// 이 아이템을 지금 쓸 수 있나 (kind 별 — 사탕은 라인 로딩 필요, 민트는 활성 포켓몬만).
@@ -111,9 +111,9 @@ private struct ItemCard: View {
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                     Spacer()
                     Button(l.use) { useNow() }
-                        .buttonStyle(.borderedProminent).controlSize(.small)
+                        .tahoeButtonStyle(.prominent).controlSize(.small)
                     Button(l.cancel) { confirming = false }
-                        .buttonStyle(.borderless).controlSize(.small)
+                        .tahoeButtonStyle(.accessory).controlSize(.small)
                 }
             } else {
                 HStack {
@@ -121,7 +121,7 @@ private struct ItemCard: View {
                         .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                     Spacer()
                     Button(l.useItem) { confirming = true }
-                        .buttonStyle(.bordered).controlSize(.small)
+                        .tahoeButtonStyle(.regular).controlSize(.small)
                 }
             }
         } else {

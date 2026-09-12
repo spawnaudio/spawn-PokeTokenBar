@@ -98,7 +98,8 @@ struct LinearIntegrationView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                 }
-                .buttonStyle(.borderless)
+                .tahoeButtonStyle(.accessory)
+                .buttonBorderShape(.circle)
                 .help(l.refreshNow)
                 .disabled(!store.linearIntegrationEnabled || !store.linearAPIKeyConfigured || store.isRefreshingLinearIssues)
             }
@@ -440,7 +441,9 @@ private struct LinearFoldableRow<Content: View>: View {
                         Image(systemName: "arrow.up.right.square")
                             .font(.caption)
                     }
-                    .buttonStyle(.borderless)
+                    .tahoeButtonStyle(.accessory)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.mini)
                     .help(openHelp)
                     .padding(.trailing, 8)
                 }
