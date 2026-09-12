@@ -179,9 +179,12 @@ struct LinearIntegrationView: View {
                 .padding(.top, 4)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 0) {
                     ForEach(visibleIssues) { issue in
                         issueCard(issue)
+                        if issue.id != visibleIssues.last?.id {
+                            Divider().opacity(0.6)
+                        }
                     }
                 }
             }
@@ -202,7 +205,7 @@ struct LinearIntegrationView: View {
                     .padding(.top, 4)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 0) {
                         ForEach(items) { row in
                             LinearFoldableRow(row: row, openHelp: openHelp) {
                                 if row.issues.isEmpty {
@@ -211,13 +214,18 @@ struct LinearIntegrationView: View {
                                         .foregroundStyle(.secondary)
                                         .padding(.vertical, 4)
                                 } else {
-                                    VStack(alignment: .leading, spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 0) {
                                         ForEach(row.issues) { issue in
                                             issueCard(issue)
+                                            if issue.id != row.issues.last?.id {
+                                                Divider().opacity(0.6)
+                                            }
                                         }
                                     }
-                                    .padding(.top, 6)
                                 }
+                            }
+                            if row.id != items.last?.id {
+                                Divider().opacity(0.6)
                             }
                         }
                     }
@@ -227,29 +235,42 @@ struct LinearIntegrationView: View {
     }
 
     private func issueCard(_ issue: LinearIssueSummary) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 6) {
+        LinearIssueEntityRow(issue: issue) {
+            nav.showFocus()
+        }
+    }
+}
+
+/// Unboxed two-line issue row: status + bright title, muted ID, chips, trailing actions.
+@MainActor
+private struct LinearIssueEntityRow: View {
+    let issue: LinearIssueSummary
+    let onPin: () -> Void
+
+    @Environment(CompanionStore.self) private var companion
+    @State private var hovering = false
+
+    private var l: L { companion.l }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 LinearStatusDot(type: issue.stateType)
-                if let name = issue.stateName, !name.isEmpty {
-                    Text(name)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                Text(issue.title)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
-                Spacer(minLength: 4)
-                LinearIssueStatusPicker(issue: issue)
-                LinearFocusButton(issue: issue, openDeskOnPin: false) {
-                    nav.showFocus()
-                }
             }
 
-            Text(issue.title)
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-
-            denseMeta(issue)
+            HStack(alignment: .center, spacing: 4) {
+                chipRow
+                Spacer(minLength: 4)
+                LinearIssueStatusPicker(issue: issue)
+                LinearFocusButton(issue: issue, openDeskOnPin: false, onPinned: onPin)
+                    .opacity(hovering ? 1 : 0.55)
+            }
 
             if let text = issue.descriptionText, !text.isEmpty {
                 Text(text)
@@ -260,59 +281,44 @@ struct LinearIntegrationView: View {
 
             LinearIssueCompletionStats(issue: issue)
         }
-        .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(Color.primary.opacity(hovering ? 0.06 : 0), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { hovering = $0 }
     }
 
     @ViewBuilder
-    private func denseMeta(_ issue: LinearIssueSummary) -> some View {
-        let chips = metaChips(issue)
+    private var chipRow: some View {
+        let chips = metaChips
         if !chips.isEmpty {
-            Text(chips.joined(separator: " · "))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(chips, id: \.self) { LinearTagChip(text: $0) }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func metaChips(_ issue: LinearIssueSummary) -> [String] {
+    private var metaChips: [String] {
         var chips: [String] = []
         if issue.priority != nil {
             chips.append(l.linearPriority(issue.priority))
         }
-        if let key = issue.teamKey, !key.isEmpty {
-            chips.append(key)
-        }
-        if let project = issue.projectName, !project.isEmpty {
-            chips.append(project)
-        }
-        if let assignee = issue.assigneeName, !assignee.isEmpty {
-            chips.append(assignee)
-        }
+        if let key = issue.teamKey, !key.isEmpty { chips.append(key) }
+        if let project = issue.projectName, !project.isEmpty { chips.append(project) }
+        if let assignee = issue.assigneeName, !assignee.isEmpty { chips.append(assignee) }
         if !issue.labelNames.isEmpty {
             chips.append(issue.labelNames.prefix(3).joined(separator: ", "))
         }
-        if let estimate = issue.estimate {
-            chips.append("E\(estimate)")
-        }
+        if let estimate = issue.estimate { chips.append("E\(estimate)") }
         if let due = issue.dueDate {
-            chips.append(shortDate(due))
+            chips.append(due.formatted(.dateTime.month(.abbreviated).day()))
         }
         return chips
     }
-
-    private func shortDate(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.abbreviated).day())
-    }
 }
 
-/// Shared unfold row for Linear projects and initiatives.
 private struct LinearContainerRow: Identifiable {
     var id: String
     var name: String
@@ -400,16 +406,11 @@ private struct LinearFoldableRow<Content: View>: View {
                         }
                         Spacer(minLength: 8)
                     }
-                    .padding(8)
+                    .padding(.vertical, 8)
+                    .padding(.leading, 4)
                     .contentShape(Rectangle())
-                    .background(
-                        hoveringHeader
-                            ? Color.primary.opacity(0.08)
-                            : Color.clear
-                    )
                 }
                 .buttonStyle(.plain)
-                .onHover { hoveringHeader = $0 }
 
                 if let url = row.url {
                     Button {
@@ -417,26 +418,20 @@ private struct LinearFoldableRow<Content: View>: View {
                     } label: {
                         Image(systemName: "arrow.up.right.square")
                             .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .tahoeButtonStyle(.accessory)
-                    .buttonBorderShape(.circle)
+                    .buttonStyle(.plain)
                     .controlSize(.mini)
                     .help(openHelp)
                     .padding(.trailing, 8)
                 }
             }
+            .background(Color.primary.opacity(hoveringHeader ? 0.08 : 0.04))
+            .onHover { hoveringHeader = $0 }
 
             if expanded {
                 content()
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
             }
         }
-        .background(Color(nsColor: .controlBackgroundColor))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

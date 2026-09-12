@@ -184,8 +184,7 @@ struct TodayDeskView: View {
     }
 
     private func labeledMinutes(_ title: String, selection: Binding<Int>, presets: [Int]) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption2).foregroundStyle(.tertiary)
+        LinearPropertyRow(label: title) {
             HStack(spacing: 4) {
                 TahoePopupMenu(
                     accessibilityLabel: title,
@@ -216,9 +215,14 @@ struct TodayDeskView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 0) {
                         ForEach(store.linearInProgressIssues) { issue in
-                            pinRow(issue)
+                            TodayDeskPinRow(issue: issue, pinned: session.session?.issue.id == issue.id) {
+                                session.pin(issue, openDesk: true)
+                            }
+                            if issue.id != store.linearInProgressIssues.last?.id {
+                                Divider().opacity(0.6)
+                            }
                         }
                     }
                 }
@@ -227,60 +231,24 @@ struct TodayDeskView: View {
         .frame(minHeight: 80, maxHeight: .infinity, alignment: .top)
     }
 
-    private func pinRow(_ issue: LinearIssueSummary) -> some View {
-        let pinned = session.session?.issue.id == issue.id
-        return HStack(alignment: .center, spacing: 6) {
-            LinearStatusDot(type: issue.stateType)
-            LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
-            Button {
-                session.pin(issue, openDesk: true)
-            } label: {
-                Text(issue.title)
-                    .font(.callout)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(8)
-        .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(pinned ? Color.accentColor.opacity(0.14) : Color(nsColor: .controlBackgroundColor))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(
-                    pinned ? Color.accentColor.opacity(0.45) : Color.primary.opacity(0.08),
-                    lineWidth: pinned ? 1 : 0.5)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .accessibilityAddTraits(pinned ? .isSelected : [])
-    }
-
     private var completedToday: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(store.linearCompletedTodayIssues) { issue in
                     HStack(alignment: .center, spacing: 6) {
                         LinearStatusDot(type: issue.stateType)
-                        LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
                         Text(issue.title)
                             .font(.caption)
+                            .foregroundStyle(.primary)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
                     }
-                    .padding(6)
-                    .background {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color(nsColor: .controlBackgroundColor))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 4)
+                    if issue.id != store.linearCompletedTodayIssues.last?.id {
+                        Divider().opacity(0.6)
                     }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
             }
         }
@@ -324,7 +292,7 @@ struct TodayDeskView: View {
                 LinearIssueIDButton(
                     identifier: current.issue.identifier,
                     url: current.issue.url,
-                    style: .title3.weight(.bold))
+                    style: .callout.weight(.medium))
                 Text(current.issue.title)
                     .font(.title2.weight(.semibold))
                     .lineLimit(3)
@@ -361,7 +329,7 @@ struct TodayDeskView: View {
                     } label: {
                         Label(l.linearOpenIssue, systemImage: "arrow.up.right.square")
                     }
-                    .tahoeButtonStyle(.regular)
+                    .tahoeButtonStyle(.accessory)
                     .controlSize(.regular)
                 }
                 FocusMarkDoneButton(title: l.markDone, disabled: !canMarkDone) {
@@ -437,20 +405,17 @@ struct TodayDeskView: View {
     }
 
     private func inspectorRow(_ field: LinearIssueInspector.Field) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(inspectorLabel(field.kind))
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+        LinearPropertyRow(label: inspectorLabel(field.kind)) {
             HStack(spacing: 6) {
                 if field.kind == .status {
                     LinearStatusDot(type: field.stateType)
                 }
                 Text(field.value)
                     .font(.callout)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func inspectorLabel(_ kind: LinearIssueInspector.Kind) -> String {
@@ -697,6 +662,40 @@ struct PopoverSessionBanner: View {
             .background(Color.red.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+    }
+}
+
+@MainActor
+private struct TodayDeskPinRow: View {
+    let issue: LinearIssueSummary
+    let pinned: Bool
+    let onPin: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            LinearStatusDot(type: issue.stateType)
+            Button(action: onPin) {
+                Text(issue.title)
+                    .font(.callout.weight(pinned ? .medium : .regular))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(
+            Color.primary.opacity(pinned ? 0.10 : (hovering ? 0.06 : 0)),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .onHover { hovering = $0 }
+        .accessibilityAddTraits(pinned ? .isSelected : [])
     }
 }
 

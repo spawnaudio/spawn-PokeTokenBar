@@ -83,7 +83,7 @@ struct FocusTabView: View {
                 } label: {
                     Label(l.linearOpenIssue, systemImage: "arrow.up.right.square")
                 }
-                .tahoeButtonStyle(.regular)
+                .tahoeButtonStyle(.accessory)
                 .controlSize(.small)
             }
             LinearIssueStatusPicker(issue: issue, compact: false)
