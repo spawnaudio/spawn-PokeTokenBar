@@ -15,8 +15,8 @@ struct SettingsView: View {
     /// 접힌 채로 열면 고칠 입력란이 안 보여 안내가 막다른 길이 된다.
     var startExpanded = false
     @State private var launchAtLogin = LoginItem.isEnabled
-    @State private var launchAtLoginError: String?
-    @State private var reportError: String?
+    @State private var launchAtLoginError: Error?
+    @State private var reportFailed = false
     @State private var advancedExpanded = false
     /// startExpanded 를 @State 초기값으로 못 쓴다 — 뷰가 재사용되면 초기화가 다시 안 돌아
     /// 두 번째 진입부터 접힌 채로 열린다. onAppear 에서 1회 반영한다.
@@ -35,6 +35,7 @@ struct SettingsView: View {
     @State private var customScanMatchTask: Task<Void, Never>?
     @State private var customScanMatchGeneration = 0
     @FocusState private var customScanFocused: Bool
+    @FocusState private var sessionKeyFocused: Bool
     private var l: L { companion.l }
 
     private var isBundledApp: Bool { AppEnv.isBundledApp }
@@ -64,29 +65,42 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    generalGroup(store)
-                    menuBarGroup(store)
-                    floatingPetGroup(store)
-                    notificationsGroup(store)
-                    updateGroup(store)
-                    transferGroup(store)
-                    advancedGroup(store)
-                    aboutSupportGroup
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        generalGroup(store)
+                        difficultyGroup
+                        menuBarGroup(store)
+                        floatingPetGroup(store)
+                        notificationsGroup(store)
+                        updateGroup(store)
+                        transferGroup(store)
+                        advancedGroup(store)
+                            .id("advancedSettingsSection")
+                        aboutSupportGroup
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .onAppear {
+                    guard !didApplyStartExpanded else { return }
+                    didApplyStartExpanded = true
+                    if startExpanded {
+                        advancedExpanded = true
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 80_000_000)
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                proxy.scrollTo("advancedSettingsSection", anchor: .top)
+                            }
+                            sessionKeyFocused = true
+                        }
+                    }
+                }
             }
             Divider()
             footer
         }
         .frame(height: 460)
-        .onAppear {
-            guard !didApplyStartExpanded else { return }
-            didApplyStartExpanded = true
-            if startExpanded { advancedExpanded = true }
-        }
     }
 
     private var header: some View {
@@ -116,10 +130,10 @@ struct SettingsView: View {
             Text("·")
             footerLink("GitHub", "https://github.com/chattymin/PokeTokenBar")
             Text("·")
-            footerLink("Web", "https://chattymin.github.io/PokeTokenBar/")
+            footerLink(l.website, "https://chattymin.github.io/PokeTokenBar/")
             Text("·")
             // 개발자 후원 — 기능 잠금·너지 없는 푸터 링크
-            footerLink("♥ Sponsor", "https://github.com/sponsors/chattymin")
+            footerLink("♥ " + l.sponsor, "https://github.com/sponsors/chattymin")
             Spacer()
             Button(l.quit) {
                 NSApplication.shared.terminate(nil)
@@ -141,7 +155,7 @@ struct SettingsView: View {
             groupRow {
                 Text(l.language)
                 Spacer()
-                Picker("", selection: Binding(
+                Picker(l.language, selection: Binding(
                     get: { companion.language },
                     set: { companion.setLanguage($0); store.localizationLanguage = $0 })) {
                     ForEach(AppLanguage.allCases, id: \.self) { Text($0.label).tag($0) }
@@ -175,7 +189,7 @@ struct SettingsView: View {
             groupRow {
                 Text(l.refreshInterval)
                 Spacer()
-                Picker("", selection: $store.refreshInterval) {
+                Picker(l.refreshInterval, selection: $store.refreshInterval) {
                     ForEach(UsageStore.intervalPresets, id: \.value) { Text(l.intervalLabel($0.value)).tag($0.value) }
                 }
                 .labelsHidden().pickerStyle(.menu).fixedSize()
@@ -188,7 +202,7 @@ struct SettingsView: View {
                     Text(l.animationQualityHint).font(.caption2).foregroundStyle(.tertiary)
                 }
                 Spacer()
-                Picker("", selection: $store.animationQuality) {
+                Picker(l.animationQualityLabel, selection: $store.animationQuality) {
                     Text(l.animationPowerSaver).tag(UsageStore.AnimationQuality.powerSaver)
                     Text(l.animationBalanced).tag(UsageStore.AnimationQuality.balanced)
                     Text(l.animationSmooth).tag(UsageStore.AnimationQuality.smooth)
@@ -199,7 +213,7 @@ struct SettingsView: View {
             groupRow {
                 Text(l.limitDisplayModeLabel)
                 Spacer()
-                Picker("", selection: $store.limitDisplayMode) {
+                Picker(l.limitDisplayModeLabel, selection: $store.limitDisplayMode) {
                     Text(l.limitDisplayUsed).tag(UsageStore.LimitDisplayMode.used)
                     Text(l.limitDisplayRemaining).tag(UsageStore.LimitDisplayMode.remaining)
                 }
@@ -213,11 +227,11 @@ struct SettingsView: View {
                         Text(l.bundledOnly).font(.caption2).foregroundStyle(.tertiary)
                     }
                     if let launchAtLoginError {
-                        Text(launchAtLoginError).font(.caption2).foregroundStyle(.red)
+                        Text(l.userFacingError(launchAtLoginError)).font(.caption2).foregroundStyle(.red)
                     }
                 }
                 Spacer()
-                Toggle("", isOn: $launchAtLogin)
+                Toggle(l.launchAtLogin, isOn: $launchAtLogin)
                     .labelsHidden().toggleStyle(.switch).controlSize(.small)
                     .disabled(!isBundledApp)
                     .onChange(of: launchAtLogin) { _, newValue in
@@ -225,12 +239,17 @@ struct SettingsView: View {
                             try LoginItem.setEnabled(newValue)   // KeepAlive 에이전트(로그인 실행+크래시 재실행)
                             launchAtLoginError = nil
                         } catch {
-                            launchAtLoginError = "\(error.localizedDescription)"
+                            AppLog.write("login item update failed: \(error)")
+                            launchAtLoginError = error
                             launchAtLogin = LoginItem.isEnabled
                         }
                     }
             }
         }
+    }
+
+    private var difficultyGroup: some View {
+        DifficultySettingsSection(companion: companion)
     }
 
     @ViewBuilder
@@ -258,14 +277,15 @@ struct SettingsView: View {
                     Text(l.floatingPetHint).font(.caption2).foregroundStyle(.tertiary)
                 }
                 Spacer()
-                Toggle("", isOn: $store.floatingPetEnabled)
+                Toggle(l.floatingPetEnableLabel, isOn: $store.floatingPetEnabled)
                     .labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
             if store.floatingPetEnabled {
                 Divider()
                 groupRow {
                     Text(l.floatingPetSizeLabel).font(.callout)
-                    Slider(value: $store.floatingPetSize, in: 48...192, step: 8)
+                    Slider(value: $store.floatingPetSize, in: 48...384, step: 8)
+                        .accessibilityLabel(l.floatingPetSizeLabel)
                     Text("\(Int(store.floatingPetSize))px")
                         .font(.caption).monospacedDigit().frame(width: 44, alignment: .trailing)
                 }
@@ -285,6 +305,7 @@ struct SettingsView: View {
                 groupRow {
                     Text(l.warning).font(.callout)
                     Slider(value: $store.warnThreshold, in: 50...95, step: 5)
+                        .accessibilityLabel(l.warning)
                     Text(TokenFormatter.percent(store.warnThreshold))
                         .font(.caption).monospacedDigit().frame(width: 38, alignment: .trailing)
                 }
@@ -292,6 +313,7 @@ struct SettingsView: View {
                 groupRow {
                     Text(l.critical).font(.callout)
                     Slider(value: $store.critThreshold, in: 80...100, step: 5)
+                        .accessibilityLabel(l.critical)
                     Text(TokenFormatter.percent(store.critThreshold))
                         .font(.caption).monospacedDigit().frame(width: 38, alignment: .trailing)
                 }
@@ -305,7 +327,7 @@ struct SettingsView: View {
                     Text(l.timeOpenXPHint).font(.caption2).foregroundStyle(.tertiary)
                 }
                 Spacer()
-                Toggle("", isOn: $store.timeOpenXPEnabled)
+                Toggle(l.timeOpenXPLabel, isOn: $store.timeOpenXPEnabled)
                     .labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
             Divider()
@@ -315,7 +337,7 @@ struct SettingsView: View {
                     Text(l.statusChecksHint).font(.caption2).foregroundStyle(.tertiary)
                 }
                 Spacer()
-                Toggle("", isOn: $store.statusChecksEnabled)
+                Toggle(l.statusChecksLabel, isOn: $store.statusChecksEnabled)
                     .labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
         }
@@ -416,6 +438,7 @@ struct SettingsView: View {
             SecureField(store.sessionKeyConfigured ? "••••••••" : "sk-ant-sid…", text: $sessionKeyInput)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 220)
+                .focused($sessionKeyFocused)
                 .onSubmit { submitSessionKey(store) }
             Button {
                 submitSessionKey(store)
@@ -440,7 +463,7 @@ struct SettingsView: View {
             groupRow {
                 Text(l.sessionKeyOrganizationLabel)
                 Spacer()
-                Picker("", selection: Binding(
+                Picker(l.sessionKeyOrganizationLabel, selection: Binding(
                     get: { store.sessionKeySelectedOrgID ?? "" },
                     set: { id in Task { await store.selectSessionOrganization(id) } })
                 ) {
@@ -483,7 +506,7 @@ struct SettingsView: View {
                 Text(l.linearIntegrationHint).font(.caption2).foregroundStyle(.tertiary)
             }
             Spacer()
-            Toggle("", isOn: $store.linearIntegrationEnabled)
+            Toggle(l.linearIntegrationLabel, isOn: $store.linearIntegrationEnabled)
                 .labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
         Divider()
@@ -577,7 +600,7 @@ struct SettingsView: View {
                         Text(l.disableKeychainHint).font(.caption2).foregroundStyle(.tertiary)
                     }
                     Spacer()
-                    Toggle("", isOn: $store.disableKeychainAccess)
+                    Toggle(l.disableKeychain, isOn: $store.disableKeychainAccess)
                         .labelsHidden().toggleStyle(.switch).controlSize(.small)
                 }
                 Divider()
@@ -611,7 +634,7 @@ struct SettingsView: View {
                         HStack {
                             Text(l.customScanProviderLabel).font(.caption)
                             Spacer()
-                            Picker("", selection: $selectedScanProviderID) {
+                            Picker(l.customScanProviderLabel, selection: $selectedScanProviderID) {
                                 ForEach(store.registeredProviders, id: \.id) { provider in
                                     Text(provider.displayName).tag(provider.id)
                                 }
@@ -676,8 +699,8 @@ struct SettingsView: View {
                     NSWorkspace.shared.activateFileViewerSelecting([AppLog.logFileURL])
                 }
             }
-            if let reportError {
-                Text(reportError)
+            if reportFailed {
+                Text(l.reportMailFallback(SupportMail.address))
                     .font(.caption2).foregroundStyle(.orange).textSelection(.enabled)
                     .padding(.horizontal, 12).padding(.bottom, 6)
             }
@@ -714,7 +737,7 @@ struct SettingsView: View {
         groupRow {
             Text(label)
             Spacer()
-            Toggle("", isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            Toggle(label, isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
     }
 
@@ -764,10 +787,10 @@ struct SettingsView: View {
             os: ProcessInfo.processInfo.operatingSystemVersionString)
         guard let url = SupportMail.mailtoURL(subject: subject, body: body),
               NSWorkspace.shared.open(url) else {
-            reportError = l.reportMailFallback(SupportMail.address)
+            reportFailed = true
             return
         }
-        reportError = nil
+        reportFailed = false
     }
 
     // MARK: 세이브 이전
@@ -795,7 +818,8 @@ struct SettingsView: View {
             try data.write(to: url, options: .atomic)
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } catch {
-            presentAlert(title: l.exportSaveLabel, message: error.localizedDescription, style: .warning)
+            AppLog.write("save export failed: \(error)")
+            presentAlert(title: l.exportSaveLabel, message: l.userFacingError(error), style: .warning)
         }
     }
 
@@ -812,6 +836,7 @@ struct SettingsView: View {
         do {
             envelope = try SaveTransfer.decode(try Data(contentsOf: url))
         } catch {
+            AppLog.write("save import read failed: \(error)")
             presentAlert(title: l.importSaveLabel, message: l.importErrorMessage(error), style: .warning)
             return
         }
@@ -825,7 +850,7 @@ struct SettingsView: View {
         confirm.informativeText = l.importConfirmBody(
             incomingDex: incoming.dexCount,
             incomingTokens: TokenFormatter.compact(incoming.lifetimeTokens),
-            exportedAt: Self.exportedAtText(envelope.exportedAt),
+            exportedAt: Self.exportedAtText(envelope.exportedAt, language: companion.language),
             sourceDevice: envelope.sourceDevice,
             currentDex: current.dexCount,
             currentTokens: TokenFormatter.compact(current.lifetimeTokens))
@@ -845,6 +870,7 @@ struct SettingsView: View {
                                     todayDate: LocalUsageReader.todayKey(),
                                     hasUsageData: store.hasUsageData)
         } catch {
+            AppLog.write("save import apply failed: \(error)")
             presentAlert(title: l.importSaveLabel, message: l.importErrorMessage(error), style: .warning)
             return
         }
@@ -855,8 +881,9 @@ struct SettingsView: View {
     }
 
     /// 확인창에 보일 내보낸 시각 — 사용자 로케일 기준 짧은 표기.
-    private static func exportedAtText(_ date: Date) -> String {
+    static func exportedAtText(_ date: Date, language: AppLanguage) -> String {
         let f = DateFormatter()
+        f.locale = language.displayLocale
         f.dateStyle = .medium
         f.timeStyle = .short
         return f.string(from: date)

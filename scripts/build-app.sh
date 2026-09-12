@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="2.5.3"
+VERSION="2.5.4"
 PRODUCT_BIN="PokeTokenBar"
 APP_NAME="${PTB_APP_NAME:-PokeTokenBar}"
 BUNDLE_ID="${PTB_BUNDLE_ID:-io.github.chattymin.poketokenbar}"
