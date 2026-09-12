@@ -841,9 +841,9 @@ struct SettingsView: View {
 
     // MARK: 세이브 이전
     //
-    // 결과를 인라인 텍스트로 못 보여주는 이유: 팝오버가 `.transient` 라 파일 선택창이 키 윈도우가 되는
-    // 순간 닫히고, popoverDidClose 가 호스팅 컨트롤러를 해제해 이 뷰(@State 포함)가 사라진다.
-    // → 성공은 Finder 노출(로그 파일 보기와 같은 방식), 그 외는 알림창으로 알린다.
+    // 성공은 Finder 노출(로그 파일 보기와 같은 방식), 그 외는 알림창으로 알린다.
+    // 메뉴바 패널은 이제 sticky 라 파일 패널이 떠도 창이 닫히지 않지만, 선택 결과는 여전히
+    // 이 경로로 알린다(인라인 상태는 패널이 가린다).
     //
     // 활성화는 `activate(ignoringOtherApps: true)` 여야 한다 — 이 앱은 LSUIElement 라 백그라운드에서
     // `NSApp.activate()`(협조적 활성화)가 무시된다. 실측: activate() 는 isActive=false 로 최전면이 안 바뀌고

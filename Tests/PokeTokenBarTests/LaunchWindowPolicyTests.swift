@@ -31,4 +31,10 @@ final class LaunchWindowPolicyTests: XCTestCase {
             identifier: LaunchWindowPolicy.newLinearIssueIdentifier,
             autosaveName: LaunchWindowPolicy.newLinearIssueAutosaveName))
     }
+
+    func testMenuBarPanelIdentifierIsNotASettingsPlaceholder() {
+        XCTAssertFalse(LaunchWindowPolicy.isSwiftUISettingsPlaceholder(
+            identifier: LaunchWindowPolicy.menuBarPanelIdentifier,
+            autosaveName: LaunchWindowPolicy.menuBarPanelAutosaveName))
+    }
 }

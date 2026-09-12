@@ -27,18 +27,30 @@ enum CollectionSegment: Hashable, CaseIterable {
     case bag, dex, shop
 }
 
-/// 팝오버 치수의 단일 소스. 자식이 쓸 수 있는 폭을 알아야 할 때 이 값을 쓴다 — 넘치는 자식이
-/// 부모 폭을 부풀리므로 GeometryReader 로 재면 순환한다.
+/// Compact / test layout width. The live menu-bar panel is a resizable window
+/// (`MenuBarPanelMetrics`, min 360 / max 720); children that need the *current*
+/// width read `\.popoverContentWidth` from the window, not this constant.
 enum PopoverMetrics {
     static let width: CGFloat = 360
     static let padding: CGFloat = 14
-    /// 이 폭을 넘는 자식은 팝오버 창에 좌우로 잘린다.
+    /// Compact content width (360 − padding). Overflow tests still use this.
     static let contentWidth: CGFloat = width - padding * 2
 }
 
+private enum PopoverContentWidthKey: EnvironmentKey {
+    static let defaultValue: CGFloat = PopoverMetrics.contentWidth
+}
+
+extension EnvironmentValues {
+    var popoverContentWidth: CGFloat {
+        get { self[PopoverContentWidthKey.self] }
+        set { self[PopoverContentWidthKey.self] = newValue }
+    }
+}
+
 /// Popover navigation (root tab / collection segment / settings).
-/// NSHostingController used to keep @State across close; AppDelegate calls reset()
-/// on each open so reopen always lands on Focus, never the previous tab or Settings.
+/// Hosting is created on show and released on close; MenuBarPanelController
+/// calls reset() so a reopen from hidden lands on Focus, never Settings.
 @MainActor
 @Observable
 final class PopoverNavigation {
@@ -96,26 +108,35 @@ struct PopoverView: View {
     private var l: L { companion.l }
 
     var body: some View {
-        // NOTE: 설정을 .sheet 로 띄우면 transient 팝오버가 닫힐 때 시트가 고아로 남아
-        // 이후 팝오버의 모든 버튼 클릭을 차단할 수 있음 — 팝오버 내부 화면 전환으로 처리
+        // NOTE: 설정을 .sheet 로 띄우면 창이 닫힐 때 시트가 고아로 남아
+        // 이후 버튼 클릭을 차단할 수 있음 — 내부 화면 전환으로 처리
         @Bindable var nav = nav
-        Group {
-            if nav.showSettings {
-                SettingsView(
-                    onClose: { nav.showSettings = false },
-                    onChooseRepresentative: { nav.openRepresentativeDex() },
-                    startExpanded: nav.expandAdvancedOnOpen
-                )
-                    .environment(store)
-                    .environment(companion)
-                    .environment(updater)
-            } else {
-                mainContent
+        GeometryReader { geo in
+            let contentWidth = max(0, geo.size.width - PopoverMetrics.padding * 2)
+            Group {
+                if nav.showSettings {
+                    SettingsView(
+                        onClose: { nav.showSettings = false },
+                        onChooseRepresentative: { nav.openRepresentativeDex() },
+                        startExpanded: nav.expandAdvancedOnOpen
+                    )
+                        .environment(store)
+                        .environment(companion)
+                        .environment(updater)
+                } else {
+                    mainContent
+                }
             }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+            .background { PopoverMaterialBackground().ignoresSafeArea() }
+            .environment(\.locale, companion.language.displayLocale)
+            .environment(\.popoverContentWidth, contentWidth)
         }
-        .frame(width: PopoverMetrics.width)
-        .background { PopoverMaterialBackground().ignoresSafeArea() }
-        .environment(\.locale, companion.language.displayLocale)
+        .frame(
+            minWidth: MenuBarPanelMetrics.minWidth,
+            maxWidth: MenuBarPanelMetrics.maxWidth,
+            minHeight: MenuBarPanelMetrics.minHeight,
+            maxHeight: MenuBarPanelMetrics.maxHeight)
     }
 
     @ViewBuilder
@@ -156,9 +177,11 @@ struct PopoverView: View {
                     CollectionTabView(store: companion, navigation: nav)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             PopoverBottomBar()
         }
         .padding(PopoverMetrics.padding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

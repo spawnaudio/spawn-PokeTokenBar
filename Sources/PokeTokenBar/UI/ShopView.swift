@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 상점 — 사용한 토큰(재화 = usedSinceInstall − spentTokens)으로 아이템 구매(이상한 사탕·민트).
-/// 인라인 확인(버튼 morph) — .sheet/.alert 금지(BagView 주석과 동일: transient 팝오버가 닫힐 때
+/// 인라인 확인(버튼 morph) — .sheet/.alert 금지(BagView 주석과 동일: 창이 닫힐 때
 /// 고아 시트가 이후 클릭을 먹통내는 결함 회피).
 @MainActor
 struct ShopView: View {
@@ -10,7 +10,7 @@ struct ShopView: View {
 
     var body: some View {
         let l = store.l
-        // 고정 높이 — 컬렉션/가방과 동일(팝오버 재오픈 시 fitting size 축소 방지).
+        // 최소 높이 — 컬렉션/가방과 동일. 창이 커지면 스크롤 영역이 나머지를 채운다.
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 walletHeader(l)
@@ -27,7 +27,7 @@ struct ShopView: View {
                 }
             }
         }
-        .frame(height: 520)
+        .frame(maxWidth: .infinity, minHeight: 520, maxHeight: .infinity)
     }
 
     private func walletHeader(_ l: L) -> some View {

@@ -27,7 +27,7 @@ struct CollectionTabView: View {
                     ShopView(store: store, nav: navigation)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 520, alignment: .top)
+            .frame(maxWidth: .infinity, minHeight: 520, maxHeight: .infinity, alignment: .top)
         }
     }
 }

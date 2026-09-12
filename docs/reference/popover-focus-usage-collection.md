@@ -3,7 +3,7 @@ summary: "Locked popover IA: Focus · Linear · Usage · Collection, nested Line
 read_when:
   - Changing popover tabs, bottom bar, Focus/Usage/Collection layout
   - Changing Linear pin, nested Linear filters, or Collection segments
-  - Restyling popover chrome (glass, cards, 360pt width)
+  - Restyling popover chrome (glass, cards, menu-bar panel size)
   - Changing the Today window (dual sidebars — see today-desk-sidebars.md)
 ---
 
@@ -15,13 +15,17 @@ This file lives under `docs/reference/` because the repo publishes only that doc
 
 ## Root chrome
 
-Width **360pt**. System light/dark. `NSVisualEffectView` material `.popover` (or `.ultraThinMaterial`). Cards: ~12pt continuous corners and a hairline. Lists stay **opaque** — Tahoe glass (`#available(macOS 26, *)`) is only on the **bottom bar** and the Focus **Pause** button (`.glassProminent` / `.borderedProminent`). SF Pro. Caption2 tertiary section labels. Clock: large rounded `monospacedDigit`.
+Sticky **NSWindow** (not a transient `NSPopover`). Click-outside and focus loss do **not** close it. Status-item click toggles; the close button and pet/open paths bring it forward if already shown. Hosting is still torn down on close (energy).
+
+Default size **360×640**. Resizable: min **360×520**, max **720×660** (Today is 920×680). Frame autosave `PokeTokenBarMenuBarPanel`. System light/dark. `NSVisualEffectView` material `.popover`. Cards: ~12pt continuous corners and a hairline. Lists stay **opaque** — Tahoe glass (`#available(macOS 26, *)`) is only on the **bottom bar** and the Focus **Pause** button (`.glassProminent` / `.borderedProminent`). SF Pro. Caption2 tertiary section labels. Clock: large rounded `monospacedDigit`.
+
+Compact layout tests still use `PopoverMetrics.width` (360). Live width is `\.popoverContentWidth`.
 
 ## Bottom bar
 
 Four labeled tabs (symbol + caption): **Focus · Linear · Usage · Collection**. Then icon-only **Today** (calendar) and **Settings**. Quit lives in Settings, not on the bar. Refresh lives on Usage and Linear only.
 
-Reopening the popover always lands on **Focus** (`PopoverNavigation.reset()`). Settings remains an in-popover swap, not a sheet.
+Reopening from hidden always lands on **Focus** (`PopoverNavigation.reset()`). Clicking outside does not hide the panel, so the current tab stays. Settings remains an in-window swap, not a sheet.
 
 ## Focus
 
