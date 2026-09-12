@@ -72,6 +72,16 @@ final class PopoverNavigation {
         tab = .focus
     }
 
+    var canGoBack: Bool { showSettings || tab != .focus }
+
+    func goBack() {
+        if showSettings {
+            showSettings = false
+            return
+        }
+        showFocus()
+    }
+
     func showFocus() {
         showSettings = false
         tab = .focus
@@ -112,29 +122,50 @@ struct PopoverView: View {
         // 이후 버튼 클릭을 차단할 수 있음 — 내부 화면 전환으로 처리
         @Bindable var nav = nav
         GeometryReader { geo in
-            let contentWidth = max(0, geo.size.width - PopoverMetrics.padding * 2)
-            Group {
-                if nav.showSettings {
-                    SettingsView(
-                        onClose: { nav.showSettings = false },
-                        onChooseRepresentative: { nav.openRepresentativeDex() },
-                        startExpanded: nav.expandAdvancedOnOpen
-                    )
-                        .environment(store)
-                        .environment(companion)
-                        .environment(updater)
-                } else {
-                    mainContent
+            let gap = MenuBarPanelMetrics.shellGap
+            let panelPad = PopoverMetrics.padding
+            let contentWidth = max(0, geo.size.width - gap * 2 - panelPad * 2)
+            VStack(spacing: 0) {
+                PopoverShellToolbar()
+                    .padding(.horizontal, gap)
+                    .padding(.top, 6)
+                    .padding(.bottom, 4)
+                VStack(alignment: .leading, spacing: 10) {
+                    if nav.showSettings {
+                        SettingsView(
+                            onClose: { nav.showSettings = false },
+                            onChooseRepresentative: { nav.openRepresentativeDex() },
+                            startExpanded: nav.expandAdvancedOnOpen
+                        )
+                            .environment(store)
+                            .environment(companion)
+                            .environment(updater)
+                    } else {
+                        updateBanner
+                        tabContent
+                    }
                 }
+                .padding(panelPad)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                }
+                .padding(.horizontal, gap)
+                .padding(.bottom, gap)
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
-            .background { PopoverMaterialBackground().ignoresSafeArea() }
+            .background(Color(nsColor: .underPageBackgroundColor))
             .environment(\.locale, companion.language.displayLocale)
             .environment(\.popoverContentWidth, contentWidth)
         }
         .frame(
             minWidth: MenuBarPanelMetrics.minWidth,
-            maxWidth: MenuBarPanelMetrics.maxWidth,
+            maxWidth: MenuBarPanelMetrics.detachedMaxWidth,
             minHeight: MenuBarPanelMetrics.minHeight,
             maxHeight: MenuBarPanelMetrics.maxHeight)
     }
@@ -162,26 +193,21 @@ struct PopoverView: View {
         }
     }
 
-    private var mainContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            updateBanner
-            Group {
-                switch nav.tab {
-                case .focus:
-                    FocusTabView()
-                case .linear:
-                    LinearIntegrationView(store: store)
-                case .usage:
-                    UsageTabView()
-                case .collection:
-                    CollectionTabView(store: companion, navigation: nav)
-                }
+    @ViewBuilder
+    private var tabContent: some View {
+        Group {
+            switch nav.tab {
+            case .focus:
+                FocusTabView()
+            case .linear:
+                LinearIntegrationView(store: store)
+            case .usage:
+                UsageTabView()
+            case .collection:
+                CollectionTabView(store: companion, navigation: nav)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            PopoverBottomBar()
         }
-        .padding(PopoverMetrics.padding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 

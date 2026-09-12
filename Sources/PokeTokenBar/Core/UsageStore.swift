@@ -1148,6 +1148,24 @@ final class UsageStore {
         }
     }
 
+    func updateLinearIssuePriority(_ issue: LinearIssueSummary, priority: Int) async {
+        guard linearIntegrationEnabled,
+              updatingLinearIssueID == nil,
+              let key = linearAPIKeys.load()?.key
+        else { return }
+
+        updatingLinearIssueID = issue.id
+        defer { updatingLinearIssueID = nil }
+
+        do {
+            try await linearClient.updateIssuePriority(
+                apiKey: key, issueID: issue.id, priority: priority)
+            applyOptimisticLinearPriorityChange(issueID: issue.id, priority: priority)
+        } catch {
+            linearIssuesError = "fetch_failed"
+        }
+    }
+
     /// Fetch + return completions when integration is on and a key is stored.
     func fetchLinearCompletionsForCompanion() async -> [LinearCompletedIssue] {
         await refreshLinearIssues()
@@ -1303,6 +1321,27 @@ final class UsageStore {
         {
             linearCompletedTodayIssues.append(issue)
             linearCompletedTodayIssues = LinearClient.sortedByPriority(linearCompletedTodayIssues)
+        }
+    }
+
+    private func applyOptimisticLinearPriorityChange(issueID: String, priority: Int) {
+        func rewrite(_ issue: LinearIssueSummary) -> LinearIssueSummary {
+            guard issue.id == issueID else { return issue }
+            var copy = issue
+            copy.priority = priority == 0 ? nil : priority
+            return copy
+        }
+        linearInProgressIssues = LinearClient.sortedByPriority(linearInProgressIssues.map(rewrite))
+        linearCompletedTodayIssues = LinearClient.sortedByPriority(linearCompletedTodayIssues.map(rewrite))
+        linearProjects = linearProjects.map { project in
+            var copy = project
+            copy.issues = LinearClient.sortedByPriority(project.issues.map(rewrite))
+            return copy
+        }
+        linearInitiatives = linearInitiatives.map { initiative in
+            var copy = initiative
+            copy.issues = LinearClient.sortedByPriority(initiative.issues.map(rewrite))
+            return copy
         }
     }
 

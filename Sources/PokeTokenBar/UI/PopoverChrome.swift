@@ -56,15 +56,17 @@ extension View {
     }
 
     /// Quiet bordered pill for menus/dropdowns.
-    func linearChipChrome(expands: Bool = false) -> some View {
+    func linearChipChrome(expands: Bool = false, tint: Color? = nil) -> some View {
         self
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(maxWidth: expands ? .infinity : nil, alignment: .leading)
-            .background(Color.primary.opacity(0.06), in: Capsule())
+            .background((tint?.opacity(0.16) ?? Color.primary.opacity(0.06)), in: Capsule())
             .overlay {
-                Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+                Capsule().strokeBorder(
+                    tint?.opacity(0.40) ?? Color.primary.opacity(0.12),
+                    lineWidth: 0.5)
             }
     }
 
@@ -161,6 +163,7 @@ struct TahoePopupMenu<Selection: Hashable, Content: View>: View {
     @Binding var selection: Selection
     var size: ControlSize = .small
     var expands: Bool = false
+    var tint: Color? = nil
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -172,9 +175,10 @@ struct TahoePopupMenu<Selection: Hashable, Content: View>: View {
             .labelsHidden()
         } label: {
             TahoeMenuLabel(text: selectionTitle, expands: expands)
+                .foregroundStyle(tint ?? Color.primary)
         }
         .menuIndicator(.hidden)
-        .linearChipChrome(expands: expands)
+        .linearChipChrome(expands: expands, tint: tint)
         .controlSize(size)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(selectionTitle)
@@ -185,11 +189,13 @@ struct TahoeTabItem<Value: Hashable> {
     let value: Value
     let title: String
     var symbol: String? = nil
+    var symbolColor: Color? = nil
 
-    init(_ value: Value, title: String, symbol: String? = nil) {
+    init(_ value: Value, title: String, symbol: String? = nil, symbolColor: Color? = nil) {
         self.value = value
         self.title = title
         self.symbol = symbol
+        self.symbolColor = symbolColor
     }
 }
 
@@ -207,9 +213,12 @@ struct TahoeTabBar<Value: Hashable>: View {
                 Button {
                     selection = item.value
                 } label: {
-                    if let symbol = item.symbol {
-                        Label(item.title, systemImage: symbol)
-                    } else {
+                    HStack(spacing: 5) {
+                        if let symbol = item.symbol {
+                            Image(systemName: symbol)
+                                .foregroundStyle(
+                                    item.symbolColor ?? (selected ? Color.primary : Color.secondary))
+                        }
                         Text(item.title)
                     }
                 }
@@ -331,7 +340,7 @@ struct FocusMarkDoneButton: View {
 }
 
 @MainActor
-struct PopoverBottomBar: View {
+struct PopoverShellToolbar: View {
     @Environment(PopoverNavigation.self) private var nav
     @Environment(FocusSessionStore.self) private var session
     @Environment(CompanionStore.self) private var companion
@@ -342,41 +351,52 @@ struct PopoverBottomBar: View {
     var body: some View {
         @Bindable var nav = nav
         HStack(spacing: 8) {
-            HStack(spacing: 2) {
+            if nav.canGoBack {
+                Button {
+                    nav.goBack()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(l.goBack)
+                .accessibilityLabel(l.goBack)
+            }
+
+            HStack(spacing: 4) {
                 ForEach(PopoverTab.allCases, id: \.self) { tab in
-                    let selected = nav.tab == tab
+                    let selected = !nav.showSettings && nav.tab == tab
                     Button {
+                        nav.showSettings = false
                         nav.tab = tab
                     } label: {
-                        VStack(spacing: 2) {
+                        HStack(spacing: 6) {
                             Image(systemName: tab.symbol)
-                                .font(.body)
-                                .symbolVariant(selected ? .fill : .none)
                             Text(tab.title(l))
-                                .font(.caption2)
                         }
-                        .frame(maxWidth: .infinity)
+                        .font(.system(size: 13, weight: selected ? .medium : .regular))
                         .foregroundStyle(selected ? Color.primary : Color.secondary)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
-                            selected ? Color.primary.opacity(0.14) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            selected ? Color.primary.opacity(0.12) : Color.clear,
+                            in: Capsule())
                         .overlay {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(
-                                    selected ? Color.primary.opacity(0.12) : Color.clear,
-                                    lineWidth: 0.5)
+                            Capsule().strokeBorder(
+                                selected ? Color.primary.opacity(0.14) : Color.clear,
+                                lineWidth: 0.5)
                         }
-                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(tab.title(l))
                     .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 4)
-            .popoverBottomBarChrome()
+
+            Spacer(minLength: 8)
 
             iconButton(
                 systemName: store.menuBarPanelDetached ? "menubar.arrow.up.rectangle" : "macwindow.on.rectangle",
@@ -389,7 +409,7 @@ struct PopoverBottomBar: View {
             iconButton(systemName: "calendar", help: l.todayDeskMenuOpen, label: l.todayDeskWindowTitle) {
                 session.openDesk()
             }
-            iconButton(systemName: "gearshape", help: l.settings, label: l.settings) {
+            iconButton(systemName: "gearshape", help: l.settings, label: l.settings, selected: nav.showSettings) {
                 nav.showSettings = true
             }
         }
@@ -408,12 +428,9 @@ struct PopoverBottomBar: View {
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
                 .frame(width: 32, height: 32)
                 .background(
-                    selected ? Color.primary.opacity(0.14) : Color.primary.opacity(0.06),
+                    selected ? Color.primary.opacity(0.14) : Color.clear,
                     in: Circle()
                 )
-                .overlay {
-                    Circle().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
-                }
         }
         .buttonStyle(.plain)
         .help(help)

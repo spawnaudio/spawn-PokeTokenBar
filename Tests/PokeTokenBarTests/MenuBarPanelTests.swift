@@ -35,7 +35,8 @@ final class MenuBarPanelTests: XCTestCase {
         XCTAssertFalse(window.styleMask.contains(.titled))
         XCTAssertTrue(window.styleMask.contains(.resizable))
         XCTAssertEqual(window.contentMinSize.width, 360)
-        XCTAssertEqual(window.contentMaxSize.width, 720)
+        XCTAssertEqual(window.contentMaxSize.width, 500)
+        XCTAssertEqual(window.backgroundColor, NSColor.underPageBackgroundColor)
     }
 
     @MainActor
@@ -67,6 +68,11 @@ final class MenuBarPanelTests: XCTestCase {
         XCTAssertEqual(
             MenuBarPanelMetrics.clampedContentSize(NSSize(width: 500, height: 600)),
             NSSize(width: 500, height: 600))
+        XCTAssertEqual(
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 900, height: 600), detached: false),
+            NSSize(width: 500, height: 600))
+        XCTAssertEqual(MenuBarPanelMetrics.maxWidth(detached: false), 500)
+        XCTAssertEqual(MenuBarPanelMetrics.maxWidth(detached: true), 720)
     }
 
     func testFrameBelowStatusItemCentersAndClampsToScreen() {
@@ -90,5 +96,43 @@ final class MenuBarPanelTests: XCTestCase {
         XCTAssertLessThanOrEqual(clamped.maxX, tight.maxX)
         XCTAssertGreaterThanOrEqual(clamped.minY, tight.minY)
         XCTAssertLessThanOrEqual(clamped.maxY, tight.maxY)
+    }
+
+    @MainActor
+    func testBackLeavesNonFocusTabsAndSettings() {
+        let nav = PopoverNavigation()
+        XCTAssertFalse(nav.canGoBack)
+        nav.tab = .linear
+        XCTAssertTrue(nav.canGoBack)
+        nav.goBack()
+        XCTAssertEqual(nav.tab, .focus)
+        XCTAssertFalse(nav.canGoBack)
+
+        nav.tab = .collection
+        nav.showSettings = true
+        XCTAssertTrue(nav.canGoBack)
+        nav.goBack()
+        XCTAssertFalse(nav.showSettings)
+        XCTAssertEqual(nav.tab, .collection)
+        nav.goBack()
+        XCTAssertEqual(nav.tab, .focus)
+    }
+
+    func testPopoverShellUsesInsetContentPanel() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokeTokenBar/UI")
+        let popover = try String(
+            contentsOf: root.appendingPathComponent("PopoverView.swift"), encoding: .utf8)
+        let chrome = try String(
+            contentsOf: root.appendingPathComponent("PopoverChrome.swift"), encoding: .utf8)
+        XCTAssertTrue(popover.contains("PopoverShellToolbar"))
+        XCTAssertTrue(popover.contains("underPageBackgroundColor"))
+        XCTAssertTrue(popover.contains("controlBackgroundColor"))
+        XCTAssertTrue(popover.contains("shellGap"))
+        XCTAssertTrue(chrome.contains("struct PopoverShellToolbar"))
+        XCTAssertTrue(chrome.contains("chevron.left"))
     }
 }

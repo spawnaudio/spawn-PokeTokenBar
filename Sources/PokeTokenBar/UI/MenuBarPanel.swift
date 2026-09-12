@@ -6,16 +6,19 @@ extension LaunchWindowPolicy {
     static let menuBarPanelAutosaveName = "PokeTokenBarMenuBarPanel"
 }
 
-/// Sticky menu-bar window. Default is the current 360pt compact size; the user
-/// can stretch it toward Today, but not past 720pt (Today is 920×680).
+/// Sticky menu-bar window. Default is the current 360pt compact size; attached
+/// stretch stops at 500pt, detached can go toward Today (720pt).
 enum MenuBarPanelMetrics {
     static let defaultWidth: CGFloat = PopoverMetrics.width
     static let defaultHeight: CGFloat = 640
     static let minWidth: CGFloat = PopoverMetrics.width
     static let minHeight: CGFloat = 520
-    static let maxWidth: CGFloat = 720
+    static let attachedMaxWidth: CGFloat = 500
+    static let detachedMaxWidth: CGFloat = 720
+    static let maxWidth: CGFloat = detachedMaxWidth
     static let maxHeight: CGFloat = 660
     static let statusItemGap: CGFloat = 6
+    static let shellGap: CGFloat = 8
     static let detachedKey = "menuBarPanelDetached"
 
     static var defaultContentSize: NSSize {
@@ -24,6 +27,10 @@ enum MenuBarPanelMetrics {
 
     static var attachedStyleMask: NSWindow.StyleMask { [.borderless, .resizable] }
     static var detachedStyleMask: NSWindow.StyleMask { [.titled, .closable, .miniaturizable, .resizable] }
+
+    static func maxWidth(detached: Bool) -> CGFloat {
+        detached ? detachedMaxWidth : attachedMaxWidth
+    }
 
     /// Dragging does not detach. Only the in-panel button does.
     static func shouldPlaceBelowStatusItem(detached: Bool) -> Bool { !detached }
@@ -38,10 +45,10 @@ enum MenuBarPanelMetrics {
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         window.contentMinSize = NSSize(width: minWidth, height: minHeight)
-        window.contentMaxSize = NSSize(width: maxWidth, height: maxHeight)
+        window.contentMaxSize = NSSize(width: maxWidth(detached: detached), height: maxHeight)
         window.setFrameAutosaveName(detached ? LaunchWindowPolicy.menuBarPanelAutosaveName : "")
-        window.isOpaque = detached
-        window.backgroundColor = detached ? .windowBackgroundColor : .clear
+        window.isOpaque = true
+        window.backgroundColor = .underPageBackgroundColor
         if let view = window.contentView {
             view.wantsLayer = true
             view.layer?.cornerRadius = detached ? 0 : 12
@@ -49,9 +56,10 @@ enum MenuBarPanelMetrics {
         }
     }
 
-    static func clampedContentSize(_ size: NSSize) -> NSSize {
-        NSSize(
-            width: min(max(size.width, minWidth), maxWidth),
+    static func clampedContentSize(_ size: NSSize, detached: Bool = true) -> NSSize {
+        let maxW = maxWidth(detached: detached)
+        return NSSize(
+            width: min(max(size.width, minWidth), maxW),
             height: min(max(size.height, minHeight), maxHeight))
     }
 
@@ -139,7 +147,9 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     }
 
     func close() {
-        window?.performClose(nil)
+        window?.orderOut(nil)
+        window?.contentView = nil
+        onVisibilityChange?()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -202,6 +212,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
             Task { @MainActor in
                 guard let self else { return }
                 self.applyChrome()
+                self.clampContentSize()
                 if let statusButton = self.statusButton,
                    MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: self.usage.menuBarPanelDetached)
                 {
@@ -215,7 +226,8 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     private func clampContentSize() {
         guard let window else { return }
         let current = window.contentRect(forFrameRect: window.frame).size
-        let clamped = MenuBarPanelMetrics.clampedContentSize(current)
+        let clamped = MenuBarPanelMetrics.clampedContentSize(
+            current, detached: usage.menuBarPanelDetached)
         if clamped != current {
             window.setContentSize(clamped)
         }

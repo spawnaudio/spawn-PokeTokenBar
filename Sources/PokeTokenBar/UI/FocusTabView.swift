@@ -135,7 +135,7 @@ struct FocusTabView: View {
                 .font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
-                Button(l.startPomodoro) { session.startPomodoro() }
+                Button(l.pomoTimer) { session.openPomodoroSetup() }
                     .tahoeButtonStyle(.prominent)
                 Button(l.openLinearTab) { nav.tab = .linear }
                     .tahoeButtonStyle(.regular)

@@ -32,7 +32,8 @@ struct LinearIssueStatusPicker: View {
                     Task { await changeStatus(to: state) }
                 }
             ),
-            size: compact ? .mini : .small
+            size: compact ? .mini : .small,
+            tint: LinearWorkflowTint.color(for: issue.stateType)
         ) {
             if states.isEmpty {
                 Text(title).tag(selectedID)
@@ -70,6 +71,110 @@ enum LinearWorkflowTint {
         case "started": return .yellow
         case "canceled", "cancelled": return .secondary
         default: return .blue
+        }
+    }
+}
+
+enum LinearPriorityTint {
+    static let gold = Color(red: 0.85, green: 0.65, blue: 0.18)
+
+    static func color(for value: Int?) -> Color {
+        switch LinearPriorityLevel.from(value) {
+        case .none: return .secondary
+        case .low: return .blue
+        case .medium: return .yellow
+        case .high: return .orange
+        case .urgent: return .red
+        }
+    }
+}
+
+enum LinearMarkdown {
+    static func attributed(_ source: String) -> AttributedString {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return AttributedString() }
+        var options = AttributedString.MarkdownParsingOptions()
+        options.interpretedSyntax = .full
+        options.failurePolicy = .returnPartiallyParsedIfPossible
+        return (try? AttributedString(markdown: trimmed, options: options)) ?? AttributedString(trimmed)
+    }
+}
+
+@MainActor
+struct LinearMarkdownText: View {
+    let source: String
+
+    var body: some View {
+        Text(LinearMarkdown.attributed(source))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+    }
+}
+
+@MainActor
+struct LinearPriorityButton: View {
+    let issue: LinearIssueSummary
+    var compact: Bool = true
+
+    @Environment(UsageStore.self) private var store
+    @Environment(CompanionStore.self) private var companion
+
+    private var l: L { companion.l }
+    private var tint: Color { LinearPriorityTint.color(for: issue.priority) }
+
+    var body: some View {
+        Menu {
+            ForEach(LinearPriorityLevel.allCases, id: \.rawValue) { option in
+                Button(l.linearPriorityChip(option == .none ? nil : option.rawValue)) {
+                    Task { await store.updateLinearIssuePriority(issue, priority: option.rawValue) }
+                }
+            }
+        } label: {
+            Text(l.linearPriorityChip(issue.priority))
+                .foregroundStyle(tint)
+        }
+        .menuIndicator(.hidden)
+        .linearChipChrome(tint: tint)
+        .controlSize(compact ? .mini : .small)
+        .disabled(store.updatingLinearIssueID != nil)
+        .help(l.linearPriorityChip(issue.priority))
+        .accessibilityLabel(l.linearPriorityChip(issue.priority))
+    }
+}
+
+@MainActor
+struct LinearIssueMetadataList: View {
+    let issue: LinearIssueSummary
+
+    @Environment(CompanionStore.self) private var companion
+
+    private var l: L { companion.l }
+
+    var body: some View {
+        let rows = LinearIssueInspector.fields(for: issue).filter { $0.kind != .status }
+        return VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, field in
+                LinearPropertyRow(label: label(field.kind)) {
+                    Text(field.value)
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func label(_ kind: LinearIssueInspector.Kind) -> String {
+        switch kind {
+        case .status: return l.linearStatusUnknown
+        case .team: return l.todayDeskTeamLabel
+        case .project: return l.todayDeskProjectLabel
+        case .assignee: return l.todayDeskAssigneeLabel
+        case .labels: return l.todayDeskLabelsLabel
+        case .estimate: return l.todayDeskEstimateLabel
+        case .due: return l.todayDeskDueLabel
         }
     }
 }

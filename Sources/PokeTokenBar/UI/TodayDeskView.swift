@@ -275,7 +275,7 @@ struct TodayDeskView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button(l.startPomodoro) { session.startPomodoro() }
+            Button(l.pomoTimer) { session.openPomodoroSetup() }
                 .tahoeButtonStyle(.prominent)
                 .controlSize(.regular)
         }
@@ -401,6 +401,9 @@ struct TodayDeskView: View {
                 } else {
                     ForEach(Array(rows.enumerated()), id: \.offset) { _, field in
                         inspectorRow(field)
+                    }
+                    if let text = issue.descriptionText, !text.isEmpty {
+                        LinearMarkdownText(source: text)
                     }
                 }
             } else {

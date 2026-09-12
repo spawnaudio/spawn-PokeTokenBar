@@ -48,6 +48,7 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
     static let bubbleBodyLineLimit = 2
     static let islandWidth: CGFloat = 228
     static let islandHeight: CGFloat = 108
+    static let setupIslandHeight: CGFloat = 132
     static let islandGap: CGFloat = 8
     /// Chevron *hit* target. Glyph stays smaller inside this frame.
     static let islandFoldChevronSize: CGFloat = 32
@@ -145,6 +146,8 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
             _ = store.limitDisplayMode   // hover 툴팁 %가 파생되는 값 — 수동 관찰 표면은 파생 원천을 직접 추적(defect-log §표시·UI)
             _ = companion.language
             _ = session.isActive
+            _ = session.pomodoroSetupOpen
+            _ = session.plannedMinutes
             _ = session.prompt
             _ = session.isComposingNote
             _ = session.forfeitPrompt
@@ -183,8 +186,9 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
                           hasIsland: Bool, prompt: FocusPrompt, composingNote: Bool = false,
                           confirm: OverlayConfirmPrompt = .none,
                           islandFolded: Bool = false,
-                          showsTimerToggle: Bool = false) -> NSSize {
-        if !hasIsland, !showsTimerToggle, prompt == .none, confirm == .none {
+                          showsTimerToggle: Bool = false,
+                          setupIsland: Bool = false) -> NSSize {
+        if !hasIsland, !showsTimerToggle, !setupIsland, prompt == .none, confirm == .none {
             if showingBubble {
                 return NSSize(width: max(petSize, bubbleMinWidth),
                               height: petSize + bubbleHeadroom)
@@ -202,16 +206,18 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
             case .checkIn: promptH = promptHeightCheckIn + 8
             }
         }
+        let islandOn = hasIsland || setupIsland
+        let folded = islandFolded && !setupIsland
         let composerH = (hasIsland && composingNote) ? noteComposerHeight : 0
-        let showsToggle = hasIsland || showsTimerToggle
+        let showsToggle = islandOn || showsTimerToggle
         let chevronW: CGFloat = showsToggle ? islandFoldChevronSize + islandGap : 0
-        let foldedClockW: CGFloat = (hasIsland && islandFolded) ? islandFoldedClockWidth + islandGap : 0
-        let showChrome = hasIsland && !islandFolded
+        let foldedClockW: CGFloat = (hasIsland && folded) ? islandFoldedClockWidth + islandGap : 0
+        let showChrome = islandOn && !folded
         let needsPromptColumn = promptH > 0 || composerH > 0
         let contentW: CGFloat = (showChrome || needsPromptColumn) ? islandWidth + islandGap : 0
         let islandW = contentW + foldedClockW + chevronW
-        let chromeH: CGFloat = showChrome ? islandHeight : 0
-        let foldedClockH: CGFloat = (hasIsland && islandFolded) ? islandFoldedClockHeight : 0
+        let chromeH: CGFloat = showChrome ? (setupIsland ? setupIslandHeight : islandHeight) : 0
+        let foldedClockH: CGFloat = (hasIsland && folded) ? islandFoldedClockHeight : 0
         let column = chromeH + composerH + promptH
         let width = max(petSize + islandW, showingBubble ? bubbleMinWidth : petSize + islandW)
         let height = (showingBubble ? bubbleHeadroom : 0) + max(petSize, column, foldedClockH)
@@ -434,7 +440,8 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
                        composingNote: session.isComposingNote,
                        confirm: overlayConfirm,
                        islandFolded: store.floatingPetIslandFolded,
-                       showsTimerToggle: true)
+                       showsTimerToggle: true,
+                       setupIsland: session.pomodoroSetupOpen && !session.isActive)
     }
 
     private func targetFrame(petSize: CGFloat, showingBubble: Bool) -> NSRect {
@@ -638,11 +645,11 @@ struct FloatingPetView: View {
             }
 
             HStack(alignment: .bottom, spacing: FloatingPetController.islandGap) {
-                if session.isActive {
+                if session.isActive || session.pomodoroSetupOpen {
                     if showsIslandColumn {
                         SessionIslandView()
                     }
-                    if store.floatingPetIslandFolded {
+                    if store.floatingPetIslandFolded && session.isActive {
                         foldedMiniClock
                     }
                 }
@@ -661,6 +668,7 @@ struct FloatingPetView: View {
     }
 
     private var showsIslandColumn: Bool {
+        if session.pomodoroSetupOpen { return true }
         if !store.floatingPetIslandFolded { return true }
         return session.forfeitPrompt != nil
             || session.resetPrompt
@@ -706,12 +714,20 @@ struct FloatingPetView: View {
 
     private var islandFoldChevron: some View {
         let l = companion.l
-        let folded = store.floatingPetIslandFolded || !session.isActive
+        let setup = session.pomodoroSetupOpen
+        let folded = store.floatingPetIslandFolded || (!session.isActive && !setup)
+        let help: String = {
+            if session.isActive { return folded ? l.expandTimer : l.collapseTimer }
+            if setup { return l.cancel }
+            return l.pomoTimer
+        }()
         return Button {
             if session.isActive {
                 store.floatingPetIslandFolded.toggle()
+            } else if setup {
+                session.cancelPomodoroSetup()
             } else {
-                session.startPomodoro()
+                session.openPomodoroSetup()
                 store.floatingPetIslandFolded = false
             }
         } label: {
@@ -732,8 +748,8 @@ struct FloatingPetView: View {
             width: FloatingPetController.islandFoldChevronSize,
             height: FloatingPetController.islandFoldChevronSize)
         .contentShape(Rectangle())
-        .help(folded ? l.expandTimer : l.collapseTimer)
-        .accessibilityLabel(folded ? l.expandTimer : l.collapseTimer)
+        .help(help)
+        .accessibilityLabel(help)
     }
 
     static func hoverTooltip(todayTokens: Int, limitUtilization: Double?,

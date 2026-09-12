@@ -113,6 +113,20 @@ enum LinearIssueInspector {
     }
 }
 
+/// Linear issue priority. 0 is none; 1 is urgent through 4 low.
+enum LinearPriorityLevel: Int, CaseIterable, Sendable {
+    case none = 0
+    case urgent = 1
+    case high = 2
+    case medium = 3
+    case low = 4
+
+    static func from(_ value: Int?) -> LinearPriorityLevel {
+        guard let value, let level = LinearPriorityLevel(rawValue: value) else { return .none }
+        return level
+    }
+}
+
 struct LinearProjectSummary: Equatable, Sendable, Identifiable {
     var id: String
     var name: String
@@ -246,6 +260,34 @@ struct LinearClient: Sendable {
         if status == 401 || status == 403 { throw LinearAPIError.unauthorized }
         guard (200..<300).contains(status) else { throw LinearAPIError.httpStatus(status) }
         return try Self.parseIssueStateUpdate(data)
+    }
+
+    /// Sets issue priority via `issueUpdate` (0 = none, 1 urgent … 4 low).
+    func updateIssuePriority(
+        apiKey: String, issueID: String, priority: Int
+    ) async throws {
+        let query = """
+        mutation UpdateLinearIssuePriority($id: String!, $priority: Int!) {
+          issueUpdate(id: $id, input: { priority: $priority }) {
+            success
+            issue { id priority }
+          }
+        }
+        """
+        let payload: [String: Any] = [
+            "query": query,
+            "variables": ["id": issueID, "priority": priority]
+        ]
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let (status, data): (Int, Data)
+        do {
+            (status, data) = try await http.postGraphQL(apiKey: apiKey, body: body)
+        } catch {
+            throw LinearAPIError.transport
+        }
+        if status == 401 || status == 403 { throw LinearAPIError.unauthorized }
+        guard (200..<300).contains(status) else { throw LinearAPIError.httpStatus(status) }
+        try Self.parseIssuePriorityUpdate(data)
     }
 
     /// Posts a new comment on an issue via `commentCreate`.
@@ -514,6 +556,23 @@ struct LinearClient: Sendable {
             stateName: state?["name"] as? String,
             stateType: state?["type"] as? String,
             completedAt: parseDate(issue["completedAt"]))
+    }
+
+    static func parseIssuePriorityUpdate(_ data: Data) throws {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw LinearAPIError.decoding
+        }
+        if let errors = root["errors"] as? [[String: Any]], !errors.isEmpty {
+            if containsUnauthorizedGraphQLError(errors) { throw LinearAPIError.unauthorized }
+            throw LinearAPIError.decoding
+        }
+        guard let dataObj = root["data"] as? [String: Any],
+              let payload = dataObj["issueUpdate"] as? [String: Any],
+              payload["success"] as? Bool == true,
+              let issue = payload["issue"] as? [String: Any],
+              let id = issue["id"] as? String, !id.isEmpty
+        else { throw LinearAPIError.decoding }
+        _ = id
     }
 
     static func parseCommentCreate(_ data: Data) throws {

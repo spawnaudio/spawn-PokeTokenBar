@@ -130,6 +130,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onOpenToday: { [weak self] in self?.todayDesk.open() },
             onNewIssue: { [weak self] in self?.issueComposer.open() }
         )   // 데스크톱 플로팅 펫(옵트인)
+        sessionStore.onRevealOverlay = { [weak self] in
+            guard let self else { return }
+            self.store.floatingPetEnabled = true
+            self.store.floatingPetIslandFolded = false
+        }
         Task { await updater.check() }                    // 기동 시 1회 업데이트 확인
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)

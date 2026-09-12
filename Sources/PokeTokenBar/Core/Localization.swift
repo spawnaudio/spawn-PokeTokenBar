@@ -41,7 +41,9 @@ struct L {
     }
     var openLinearTab: String { t("Linear 열기", "Open Linear", "Linearを開く", "Abrir Linear", "Ouvrir Linear", "Abrir Linear", "Linear öffnen") }
     var pomodoroTitle: String { t("포모도로", "Pomodoro", "ポモドーロ", "Pomodoro", "Pomodoro", "Pomodoro", "Pomodoro") }
-    var startPomodoro: String { t("포모도로 시작", "Start pomodoro", "ポモドーロを開始", "Iniciar pomodoro", "Démarrer le pomodoro", "Iniciar pomodoro", "Pomodoro starten") }
+    var pomoTimer: String { t("포모 타이머", "Pomo Timer", "ポモタイマー", "Pomo Timer", "Pomo Timer", "Pomo Timer", "Pomo-Timer") }
+    var startPomodoro: String { t("시작", "Start", "開始", "Iniciar", "Démarrer", "Iniciar", "Start") }
+    var goBack: String { t("뒤로", "Back", "戻る", "Atrás", "Retour", "Voltar", "Zurück") }
     var detachMenuBarPanel: String {
         t("메뉴바에서 분리", "Detach from menu bar", "メニューバーから切り離す", "Separar de la barra de menús", "Détacher de la barre des menus", "Desanexar da barra de menus", "Von der Menüleiste lösen")
     }
@@ -469,13 +471,16 @@ struct L {
           "\(count) erledigt")
     }
     func linearPriority(_ value: Int?) -> String {
-        guard let value else { return t("우선순위 없음", "No priority", "優先度なし", "Sin prioridad", "Sans priorité", "Sem prioridade", "Keine Priorität") }
-        switch value {
-        case 1: return t("P1 긴급", "P1 Urgent", "P1 緊急", "P1 Urgente", "P1 Urgent", "P1 Urgente", "P1 Dringend")
-        case 2: return t("P2 높음", "P2 High", "P2 高", "P2 Alta", "P2 Haute", "P2 Alta", "P2 Hoch")
-        case 3: return t("P3 보통", "P3 Medium", "P3 中", "P3 Media", "P3 Moyenne", "P3 Média", "P3 Mittel")
-        case 4: return t("P4 낮음", "P4 Low", "P4 低", "P4 Baja", "P4 Basse", "P4 Baixa", "P4 Niedrig")
-        default: return "P\(value)"
+        linearPriorityChip(value)
+    }
+    /// Compact chip labels (Linear: Priority / Urgent / High / Medium / Low).
+    func linearPriorityChip(_ value: Int?) -> String {
+        switch LinearPriorityLevel.from(value) {
+        case .none: return t("우선순위", "Priority", "優先度", "Prioridad", "Priorité", "Prioridade", "Priorität")
+        case .urgent: return t("긴급", "Urgent", "緊急", "Urgente", "Urgent", "Urgente", "Dringend")
+        case .high: return t("높음", "High", "高", "Alta", "Haute", "Alta", "Hoch")
+        case .medium: return t("보통", "Medium", "中", "Media", "Moyenne", "Média", "Mittel")
+        case .low: return t("낮음", "Low", "低", "Baja", "Basse", "Baixa", "Niedrig")
         }
     }
     var timeXPTitle: String { t("시간 XP", "Time XP", "時間XP", "XP tiempo", "XP temps", "XP tempo", "Zeit-XP") }
