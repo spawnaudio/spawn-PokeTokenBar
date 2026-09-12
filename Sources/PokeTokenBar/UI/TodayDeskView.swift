@@ -2,27 +2,6 @@ import AppKit
 import SwiftUI
 
 /// Dual-sidebar Today window. Closing it does not stop a running session.
-enum TodayDeskMetrics {
-    static let defaultWidth: CGFloat = 920
-    static let defaultHeight: CGFloat = 680
-    static let minHeight: CGFloat = 560
-    static let leftSidebarWidth: CGFloat = 212
-    static let rightSidebarWidth: CGFloat = 232
-    static let minCenterWidth: CGFloat = 360
-    static let columnGap: CGFloat = 12
-    static let contentPadding: CGFloat = 16
-
-    static var columnsWidth: CGFloat {
-        leftSidebarWidth + rightSidebarWidth + minCenterWidth + columnGap * 2
-    }
-
-    static var minWidth: CGFloat { columnsWidth + contentPadding * 2 }
-
-    static func fitsThreeColumns(_ width: CGFloat) -> Bool {
-        width >= minWidth
-    }
-}
-
 @MainActor
 final class TodayDeskController: NSObject, NSWindowDelegate {
     private let usage: UsageStore
@@ -71,6 +50,7 @@ final class TodayDeskController: NSObject, NSWindowDelegate {
             defer: false)
         window.title = L(companion.language).todayDeskWindowTitle
         window.identifier = NSUserInterfaceItemIdentifier(LaunchWindowPolicy.todayDeskIdentifier)
+        // Frame only. Sidebar widths/collapse are UsageStore keys (`todayDeskLeftWidth` etc.).
         window.setFrameAutosaveName(LaunchWindowPolicy.todayDeskAutosaveName)
         window.contentMinSize = NSSize(
             width: TodayDeskMetrics.minWidth,
@@ -97,17 +77,48 @@ struct TodayDeskView: View {
     private var l: L { companion.l }
 
     var body: some View {
-        HStack(alignment: .top, spacing: TodayDeskMetrics.columnGap) {
-            leftSidebar
-                .frame(width: TodayDeskMetrics.leftSidebarWidth)
-            Divider()
-            centerColumn
-                .frame(minWidth: TodayDeskMetrics.minCenterWidth, maxWidth: .infinity, maxHeight: .infinity)
-            Divider()
-            rightSidebar
-                .frame(width: TodayDeskMetrics.rightSidebarWidth)
+        GeometryReader { geo in
+            let containerWidth = max(0, geo.size.width - TodayDeskMetrics.contentPadding * 2)
+            let resolved = store.todayDeskLayout.resolved(containerWidth: containerWidth)
+            HStack(alignment: .top, spacing: 0) {
+                if !resolved.leftCollapsed {
+                    leftSidebar
+                        .frame(width: resolved.leftWidth)
+                        .clipped()
+                }
+                TodayDeskSplitter(
+                    collapsed: resolved.leftCollapsed,
+                    displayedWidth: resolved.leftWidth,
+                    growsWhenDraggedPositive: true,
+                    collapseLabel: l.collapseLeftSidebar,
+                    expandLabel: l.expandLeftSidebar,
+                    onToggle: { store.todayDeskLayout = store.todayDeskLayout.togglingLeft() },
+                    onDragTo: { width in
+                        store.todayDeskLayout = store.todayDeskLayout.settingLeftWidth(
+                            width, containerWidth: containerWidth)
+                    })
+                centerColumn
+                    .frame(minWidth: TodayDeskMetrics.minCenterWidth, maxWidth: .infinity, maxHeight: .infinity)
+                TodayDeskSplitter(
+                    collapsed: resolved.rightCollapsed,
+                    displayedWidth: resolved.rightWidth,
+                    growsWhenDraggedPositive: false,
+                    collapseLabel: l.collapseRightSidebar,
+                    expandLabel: l.expandRightSidebar,
+                    onToggle: { store.todayDeskLayout = store.todayDeskLayout.togglingRight() },
+                    onDragTo: { width in
+                        store.todayDeskLayout = store.todayDeskLayout.settingRightWidth(
+                            width, containerWidth: containerWidth)
+                    })
+                if !resolved.rightCollapsed {
+                    rightSidebar
+                        .frame(width: resolved.rightWidth)
+                        .clipped()
+                }
+            }
+            .padding(TodayDeskMetrics.contentPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(TodayDeskMetrics.contentPadding)
         .frame(minWidth: TodayDeskMetrics.minWidth, minHeight: TodayDeskMetrics.minHeight)
         .background { PopoverMaterialBackground().ignoresSafeArea() }
         .task(id: store.linearIntegrationEnabled && store.linearAPIKeyConfigured) {
@@ -514,6 +525,80 @@ struct TodayDeskView: View {
         .foregroundStyle(entry.usesDestructiveTint ? Color.red : Color.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Hairline column splitter + overlay-sized fold chevron. Drag resizes; chevron or
+/// double-click collapses. Collapsed sidebars keep this strip so they can expand.
+@MainActor
+private struct TodayDeskSplitter: View {
+    var collapsed: Bool
+    var displayedWidth: CGFloat
+    var growsWhenDraggedPositive: Bool
+    var collapseLabel: String
+    var expandLabel: String
+    var onToggle: () -> Void
+    var onDragTo: (CGFloat) -> Void
+
+    @State private var dragOrigin: CGFloat?
+    @State private var cursorPushed = false
+
+    private var chevronName: String {
+        if growsWhenDraggedPositive {
+            return collapsed ? "chevron.right" : "chevron.left"
+        }
+        return collapsed ? "chevron.left" : "chevron.right"
+    }
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(width: 0.5)
+            Button(action: onToggle) {
+                Image(systemName: chevronName)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(
+                        width: TodayDeskMetrics.chevronHitSize,
+                        height: TodayDeskMetrics.chevronHitSize)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(collapsed ? expandLabel : collapseLabel)
+            .accessibilityLabel(collapsed ? expandLabel : collapseLabel)
+        }
+        .frame(width: TodayDeskMetrics.splitterWidth)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                NSCursor.resizeLeftRight.push()
+                cursorPushed = true
+            } else if cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
+        }
+        .onDisappear {
+            if cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 2)
+                .onChanged { value in
+                    guard !collapsed else { return }
+                    if dragOrigin == nil { dragOrigin = displayedWidth }
+                    let delta = growsWhenDraggedPositive ? value.translation.width : -value.translation.width
+                    onDragTo((dragOrigin ?? displayedWidth) + delta)
+                }
+                .onEnded { _ in
+                    dragOrigin = nil
+                }
+        )
+        .onTapGesture(count: 2, perform: onToggle)
     }
 }
 
