@@ -110,6 +110,28 @@ struct FocusPauseButton: View {
     }
 }
 
+/// Tahoe glass on Mark done (Today / Focus primary). Lists stay opaque.
+@MainActor
+struct FocusMarkDoneButton: View {
+    let title: String
+    let disabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        if #available(macOS 26, *) {
+            Button(title, action: action)
+                .buttonStyle(.glassProminent)
+                .controlSize(.regular)
+                .disabled(disabled)
+        } else {
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(disabled)
+        }
+    }
+}
+
 @MainActor
 struct PopoverBottomBar: View {
     @Environment(PopoverNavigation.self) private var nav

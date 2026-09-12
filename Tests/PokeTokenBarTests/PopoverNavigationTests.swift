@@ -108,11 +108,16 @@ final class RepresentativeLocalizationTests: XCTestCase {
             XCTAssertFalse(l.todayUsageSection.isEmpty, "\(lang.rawValue).todayUsageSection")
             XCTAssertFalse(l.focusIdlePrompt.isEmpty, "\(lang.rawValue).focusIdlePrompt")
             XCTAssertFalse(l.openLinearTab.isEmpty, "\(lang.rawValue).openLinearTab")
+            XCTAssertFalse(l.todayDeskEmptyHint.isEmpty, "\(lang.rawValue).todayDeskEmptyHint")
+            XCTAssertFalse(l.todayDeskDetailsSection.isEmpty, "\(lang.rawValue).todayDeskDetailsSection")
+            XCTAssertFalse(l.todayDeskTeamLabel.isEmpty, "\(lang.rawValue).todayDeskTeamLabel")
         }
         let en = L(.en)
         XCTAssertEqual(en.focusIdlePrompt, "Select a Linear issue to focus")
         XCTAssertEqual(en.openLinearTab, "Open Linear")
         XCTAssertEqual(en.usageTab, "Usage")
         XCTAssertEqual(en.dexSegment, "Dex")
+        XCTAssertEqual(en.todayDeskWindowTitle, "Today")
+        XCTAssertEqual(en.todayDeskEmptyHint, "Pin an in-progress issue from the left list.")
     }
 }

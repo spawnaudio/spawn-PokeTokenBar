@@ -251,7 +251,7 @@ struct LinearIntegrationView: View {
     private func issueCard(_ issue: LinearIssueSummary) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center, spacing: 6) {
-                statusDot(issue.stateType)
+                LinearStatusDot(type: issue.stateType)
                 if let name = issue.stateName, !name.isEmpty {
                     Text(name)
                         .font(.caption2)
@@ -327,22 +327,6 @@ struct LinearIntegrationView: View {
             chips.append(shortDate(due))
         }
         return chips
-    }
-
-    private func statusDot(_ type: String?) -> some View {
-        Circle()
-            .fill(statusColor(type))
-            .frame(width: 8, height: 8)
-            .accessibilityHidden(true)
-    }
-
-    private func statusColor(_ type: String?) -> Color {
-        switch (type ?? "").lowercased() {
-        case "completed": return .green
-        case "started": return .yellow
-        case "canceled", "cancelled": return .secondary
-        default: return .blue
-        }
     }
 
     private func shortDate(_ date: Date) -> String {

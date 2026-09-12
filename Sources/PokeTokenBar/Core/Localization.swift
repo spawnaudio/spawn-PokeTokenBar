@@ -394,10 +394,27 @@ struct L {
 
     var todayDeskWindowTitle: String { t("오늘", "Today", "今日", "Hoy", "Aujourd’hui", "Hoje", "Heute") }
     var todayDeskMenuOpen: String { t("오늘 열기", "Open Today", "今日を開く", "Abrir Hoy", "Ouvrir Aujourd’hui", "Abrir Hoje", "Heute öffnen") }
-    var todayDeskEmpty: String { t("집중할 Linear 이슈를 선택하세요.", "Select a Linear issue to focus on.", "集中するLinear課題を選んでください。", "Selecciona una issue de Linear para centrarte.", "Choisis une issue Linear sur laquelle te concentrer.", "Selecione uma issue do Linear para focar.", "Wähle ein Linear-Issue zum Fokussieren.") }
+    var todayDeskEmpty: String { t("집중할 Linear 이슈를 선택하세요.", "Select a Linear issue to focus.", "集中するLinear課題を選んでください。", "Selecciona una issue de Linear para centrarte.", "Choisis une issue Linear sur laquelle te concentrer.", "Selecione uma issue do Linear para focar.", "Wähle ein Linear-Issue zum Fokussieren.") }
+    var todayDeskEmptyHint: String {
+        t("왼쪽 목록에서 진행 중 이슈를 집중하세요.",
+          "Pin an in-progress issue from the left list.",
+          "左のリストから進行中の課題を集中してください。",
+          "Fija una issue en curso de la lista izquierda.",
+          "Épingle une issue en cours depuis la liste de gauche.",
+          "Fixe uma issue em andamento da lista à esquerda.",
+          "Hefte ein Issue in Arbeit aus der linken Liste.")
+    }
     var todayDeskPinList: String { t("진행 중", "In progress", "進行中", "En curso", "En cours", "Em andamento", "In Arbeit") }
     var todayDeskLogTitle: String { t("오늘 기록", "Today’s log", "今日の記録", "Registro de hoy", "Journal du jour", "Registro de hoje", "Heutiges Protokoll") }
     var todayDeskLogEmpty: String { t("아직 세션이 없습니다.", "No sessions yet.", "まだセッションはありません。", "Aún no hay sesiones.", "Pas encore de sessions.", "Ainda não há sessões.", "Noch keine Sitzungen.") }
+    var todayDeskDetailsSection: String { t("이슈 정보", "Details", "課題情報", "Detalles", "Détails", "Detalhes", "Details") }
+    var todayDeskInspectorEmpty: String { t("고정된 이슈가 없습니다.", "No issue pinned.", "ピン留めされた課題はありません。", "No hay issue fijada.", "Aucune issue épinglée.", "Nenhuma issue fixada.", "Kein Issue angeheftet.") }
+    var todayDeskTeamLabel: String { t("팀", "Team", "チーム", "Equipo", "Équipe", "Time", "Team") }
+    var todayDeskProjectLabel: String { t("프로젝트", "Project", "プロジェクト", "Proyecto", "Projet", "Projeto", "Projekt") }
+    var todayDeskAssigneeLabel: String { t("담당자", "Assignee", "担当者", "Asignado", "Assigné", "Responsável", "Zuständig") }
+    var todayDeskLabelsLabel: String { t("레이블", "Labels", "ラベル", "Etiquetas", "Libellés", "Rótulos", "Labels") }
+    var todayDeskEstimateLabel: String { t("추정", "Estimate", "見積", "Estimación", "Estimation", "Estimativa", "Schätzung") }
+    var todayDeskDueLabel: String { t("기한", "Due", "期限", "Vencimiento", "Échéance", "Prazo", "Fällig") }
     var focusAction: String { t("집중", "Focus", "集中", "Enfoque", "Focus", "Foco", "Fokus") }
     var focusingNow: String { t("집중 중", "Focusing", "集中中", "Enfocando", "En cours", "Focado", "Aktiv") }
     var pauseTimer: String { t("일시정지", "Pause", "一時停止", "Pausa", "Pause", "Pausar", "Pause") }

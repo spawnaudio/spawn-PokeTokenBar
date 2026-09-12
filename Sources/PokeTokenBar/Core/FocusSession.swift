@@ -577,6 +577,9 @@ struct FocusLogEntry: Codable, Equatable, Identifiable {
 
     enum Kind: String, Codable { case session, checkIn, note, forfeit }
 
+    /// Forfeit rows stay red in the Today log; other kinds use secondary text.
+    var usesDestructiveTint: Bool { kind == .forfeit }
+
     static func session(
         day: String,
         issue: FocusPinnedIssue,

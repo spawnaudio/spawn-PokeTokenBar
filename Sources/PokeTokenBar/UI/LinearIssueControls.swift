@@ -58,6 +58,31 @@ struct LinearIssueStatusPicker: View {
     }
 }
 
+/// Linear workflow tint for the 8pt status dot (popover rows + Today pin list / inspector).
+enum LinearWorkflowTint {
+    static func color(for type: String?) -> Color {
+        switch (type ?? "").lowercased() {
+        case "completed": return .green
+        case "started": return .yellow
+        case "canceled", "cancelled": return .secondary
+        default: return .blue
+        }
+    }
+}
+
+@MainActor
+struct LinearStatusDot: View {
+    var type: String?
+    var size: CGFloat = 8
+
+    var body: some View {
+        Circle()
+            .fill(LinearWorkflowTint.color(for: type))
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
 @MainActor
 struct LinearIssueIDButton: View {
     let identifier: String

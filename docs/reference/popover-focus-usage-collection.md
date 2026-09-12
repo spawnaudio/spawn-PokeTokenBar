@@ -4,6 +4,7 @@ read_when:
   - Changing popover tabs, bottom bar, Focus/Usage/Collection layout
   - Changing Linear pin, nested Linear filters, or Collection segments
   - Restyling popover chrome (glass, cards, 360pt width)
+  - Changing the Today window (dual sidebars — see today-desk-sidebars.md)
 ---
 
 # Popover Focus / Usage / Collection
@@ -40,6 +41,10 @@ Keep nested tabs — do not flatten:
 Header: New issue + refresh (calendar is the trailing Today icon). Dense rows from already-fetched `LinearIssueSummary`: status dot+name, ID pill, title, priority, teamKey, projectName, assigneeName, truncated labels, estimate, dueDate, one muted description line. Hide empty fields. Completion XP when present. Project/initiative headers: lead/owner, targetDate, status, issue count.
 
 **Pin** starts the session and **switches to the Focus tab**. Do **not** auto-open Today from this pin. Today still opens from the calendar icon, the idle CTA, and the pet menu. Pinning from the Today desk is unchanged (`openDesk` as today).
+
+## Today window
+
+Not a popover tab. Dual sidebars (~920×680): left pin list, Focus-like hero, right inspector + log. See `docs/reference/today-desk-sidebars.md`.
 
 ## Usage
 
