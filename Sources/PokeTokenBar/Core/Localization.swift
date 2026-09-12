@@ -21,11 +21,25 @@ struct L {
 
     // MARK: 탭
     var home: String { t("홈", "Home", "ホーム", "Inicio", "Accueil", "Início", "Startseite") }
+    var focusTab: String { t("집중", "Focus", "集中", "Enfoque", "Focus", "Foco", "Fokus") }
     var linearTab: String { t("Linear", "Linear", "Linear", "Linear", "Linear", "Linear", "Linear") }
+    var usageTab: String { t("사용량", "Usage", "使用量", "Uso", "Usage", "Uso", "Nutzung") }
     var timeXPTab: String { t("시간 XP", "Time XP", "時間XP", "XP tiempo", "XP temps", "XP tempo", "Zeit-XP") }
-    /// 상위 탭 이름 — 안에서 도감/포획 로그를 세그먼트로 전환하므로 둘을 아우르는 말이어야 한다.
-    /// (ko 가 "도감"이면 탭과 세그먼트가 같은 이름이 돼 en/ja 의 Collection/コレクション 과도 어긋난다.)
+    /// 상위 탭 이름 — 안에서 가방/도감/상점을 세그먼트로 전환하므로 둘을 아우르는 말이어야 한다.
     var collection: String { t("컬렉션", "Collection", "コレクション", "Colección", "Collection", "Coleção", "Sammlung") }
+    var dexSegment: String { t("도감", "Dex", "図鑑", "Pokédex", "Pokédex", "Pokédex", "Pokédex") }
+    var activeIssueSection: String { t("활성 이슈", "Active issue", "進行中の課題", "Issue activa", "Issue active", "Issue ativa", "Aktives Issue") }
+    var todayUsageSection: String { t("오늘 사용량", "Today's usage", "本日の使用量", "Uso de hoy", "Usage du jour", "Uso de hoje", "Heutige Nutzung") }
+    var focusIdlePrompt: String {
+        t("집중할 Linear 이슈를 선택하세요",
+          "Select a Linear issue to focus",
+          "集中するLinear課題を選んでください",
+          "Selecciona una issue de Linear para centrarte",
+          "Choisis une issue Linear sur laquelle te concentrer",
+          "Selecione uma issue do Linear para focar",
+          "Wähle ein Linear-Issue zum Fokussieren")
+    }
+    var openLinearTab: String { t("Linear 열기", "Open Linear", "Linearを開く", "Abrir Linear", "Ouvrir Linear", "Abrir Linear", "Linear öffnen") }
 
     // MARK: 헤더 (오늘/주/월)
     var todayTokens: String { t("오늘 사용한 토큰", "Today's tokens", "本日のトークン", "Tokens de hoy", "Tokens du jour", "Tokens de hoje", "Heute verbrauchte Tokens") }
@@ -349,6 +363,8 @@ struct L {
           "\(identifier) · \(title)")
     }
     var linearCompletedFlashTitle: String { t("완료", "Done", "完了", "Hecho", "Terminé", "Concluído", "Fertig") }
+    var timesUpFlashTitle: String { t("시간 종료", "Time’s up", "時間切れ", "Se acabó", "Temps écoulé", "Tempo esgotado", "Zeit ist um") }
+    var forfeitFlashTitle: String { t("포기", "Forfeit", "放棄", "Abandono", "Abandon", "Desistência", "Aufgegeben") }
     func linearCompletedFlashTitleCount(_ count: Int) -> String {
         t("\(count)건 완료",
           "\(count) done",

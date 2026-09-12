@@ -45,7 +45,7 @@ private enum LinearInitiativesTab: Hashable {
 struct LinearIntegrationView: View {
     let store: UsageStore
     @Environment(CompanionStore.self) private var companion
-    @Environment(FocusSessionStore.self) private var session
+    @Environment(PopoverNavigation.self) private var nav
     @State private var selectedRoot: LinearRootTab = .issues
     @State private var selectedIssuesTab: LinearIssuesTab = .inProgress
     @State private var selectedProjectsTab: LinearProjectsTab = .inProgress
@@ -86,9 +86,23 @@ struct LinearIntegrationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let warning = session.forfeitPrompt {
-                FocusForfeitWarningCard(warning: warning)
+            HStack {
+                NewLinearIssueButton(showsTitle: true)
+                Spacer()
+                Button {
+                    Task { _ = await store.refreshLinearIssues() }
+                } label: {
+                    if store.isRefreshingLinearIssues {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                }
+                .buttonStyle(.borderless)
+                .help(l.refreshNow)
+                .disabled(!store.linearIntegrationEnabled || !store.linearAPIKeyConfigured || store.isRefreshingLinearIssues)
             }
+
             HStack {
                 Image(systemName: selectedRoot.symbol)
                     .font(.body)
@@ -102,27 +116,6 @@ struct LinearIntegrationView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                Spacer()
-                NewLinearIssueButton()
-                Button {
-                    session.openDesk()
-                } label: {
-                    Image(systemName: "calendar")
-                }
-                .buttonStyle(.borderless)
-                .help(l.todayDeskMenuOpen)
-                Button {
-                    Task { _ = await store.refreshLinearIssues() }
-                } label: {
-                    if store.isRefreshingLinearIssues {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-                .buttonStyle(.borderless)
-                .help(l.refreshNow)
-                .disabled(!store.linearIntegrationEnabled || !store.linearAPIKeyConfigured || store.isRefreshingLinearIssues)
             }
 
             if !store.linearIntegrationEnabled || !store.linearAPIKeyConfigured {
@@ -256,126 +249,104 @@ struct LinearIntegrationView: View {
     }
 
     private func issueCard(_ issue: LinearIssueSummary) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: LinearChromeSymbol.issue)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text(issue.identifier)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                priorityBadge(issue.priority)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 6) {
+                statusDot(issue.stateType)
+                if let name = issue.stateName, !name.isEmpty {
+                    Text(name)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
                 Spacer(minLength: 4)
                 LinearIssueStatusPicker(issue: issue)
-                LinearFocusButton(issue: issue)
-                if let url = issue.issueURL {
-                    Button {
-                        NSWorkspace.shared.open(url)
-                    } label: {
-                        Image(systemName: "arrow.up.right.square")
-                            .font(.caption2)
-                    }
-                    .buttonStyle(.borderless)
-                    .help(l.linearOpenIssue)
+                LinearFocusButton(issue: issue, openDeskOnPin: false) {
+                    nav.showFocus()
                 }
             }
 
             Text(issue.title)
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            denseMeta(issue)
 
             if let text = issue.descriptionText, !text.isEmpty {
                 Text(text)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(3)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
 
-            metadataRow(issue)
             LinearIssueCompletionStats(issue: issue)
         }
-        .padding(8)
-        .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(10)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder
-    private func metadataRow(_ issue: LinearIssueSummary) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 8) {
-                if let assignee = issue.assigneeName {
-                    metadataChip(Image(systemName: "person.fill"), assignee)
-                }
-                if let email = issue.assigneeEmail {
-                    metadataChip(Image(systemName: "envelope"), email)
-                }
-            }
-            HStack(spacing: 8) {
-                if let team = issue.teamName {
-                    metadataChip(Image(systemName: "person.3.fill"), teamKeyLabel(name: team, key: issue.teamKey))
-                }
-                if let project = issue.projectName {
-                    metadataChip(Image(systemName: "folder.fill"), project)
-                }
-                if let estimate = issue.estimate {
-                    metadataChip(Image(systemName: "number"), "E\(estimate)")
-                }
-            }
-            if !issue.labelNames.isEmpty {
-                metadataChip(Image(systemName: "tag.fill"), issue.labelNames.joined(separator: ", "))
-            }
-            HStack(spacing: 8) {
-                if let due = issue.dueDate {
-                    metadataChip(Image(systemName: "calendar"), relativeDateText(due))
-                }
-                if let completed = issue.completedAt {
-                    metadataChip(Image(systemName: "checkmark.circle"), relativeDateText(completed))
-                }
-                if let updated = issue.updatedAt {
-                    metadataChip(Image(systemName: "clock"), "\(l.updated) \(relativeDateText(updated))")
-                }
-            }
-        }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-    }
-
-    private func metadataChip(_ icon: Image, _ text: String) -> some View {
-        HStack(spacing: 3) {
-            icon
-            Text(text)
+    private func denseMeta(_ issue: LinearIssueSummary) -> some View {
+        let chips = metaChips(issue)
+        if !chips.isEmpty {
+            Text(chips.joined(separator: " · "))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
     }
 
-    private func priorityBadge(_ value: Int?) -> some View {
-        Text(l.linearPriority(value))
-            .font(.system(size: 9, weight: .bold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(priorityColor(value).opacity(0.2))
-            .foregroundStyle(priorityColor(value))
-            .clipShape(Capsule())
+    private func metaChips(_ issue: LinearIssueSummary) -> [String] {
+        var chips: [String] = []
+        if issue.priority != nil {
+            chips.append(l.linearPriority(issue.priority))
+        }
+        if let key = issue.teamKey, !key.isEmpty {
+            chips.append(key)
+        }
+        if let project = issue.projectName, !project.isEmpty {
+            chips.append(project)
+        }
+        if let assignee = issue.assigneeName, !assignee.isEmpty {
+            chips.append(assignee)
+        }
+        if !issue.labelNames.isEmpty {
+            chips.append(issue.labelNames.prefix(3).joined(separator: ", "))
+        }
+        if let estimate = issue.estimate {
+            chips.append("E\(estimate)")
+        }
+        if let due = issue.dueDate {
+            chips.append(shortDate(due))
+        }
+        return chips
     }
 
-    private func priorityColor(_ value: Int?) -> Color {
-        switch value {
-        case 1: return .red
-        case 2: return .orange
-        case 3: return .yellow
-        case 4: return .blue
-        default: return .secondary
+    private func statusDot(_ type: String?) -> some View {
+        Circle()
+            .fill(statusColor(type))
+            .frame(width: 8, height: 8)
+            .accessibilityHidden(true)
+    }
+
+    private func statusColor(_ type: String?) -> Color {
+        switch (type ?? "").lowercased() {
+        case "completed": return .green
+        case "started": return .yellow
+        case "canceled", "cancelled": return .secondary
+        default: return .blue
         }
     }
 
-    private func teamKeyLabel(name: String, key: String?) -> String {
-        guard let key, !key.isEmpty else { return name }
-        return "\(name) (\(key))"
-    }
-
-    private func relativeDateText(_ date: Date) -> String {
-        RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
+    private func shortDate(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day())
     }
 }
 
@@ -385,6 +356,8 @@ private struct LinearContainerRow: Identifiable {
     var name: String
     var url: URL?
     var statusName: String?
+    var leadOrOwner: String?
+    var targetDate: Date?
     var symbol: String
     var issues: [LinearIssueSummary]
 
@@ -393,6 +366,8 @@ private struct LinearContainerRow: Identifiable {
         name = project.name
         url = project.url
         statusName = project.statusName ?? project.statusType
+        leadOrOwner = project.leadName
+        targetDate = project.targetDate
         symbol = LinearChromeSymbol.project
         issues = project.issues
     }
@@ -402,6 +377,8 @@ private struct LinearContainerRow: Identifiable {
         name = initiative.name
         url = initiative.url
         statusName = initiative.statusName
+        leadOrOwner = initiative.ownerName
+        targetDate = initiative.targetDate
         symbol = LinearChromeSymbol.initiative
         issues = initiative.issues
     }
@@ -443,6 +420,17 @@ private struct LinearFoldableRow<Content: View>: View {
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
+                                if let person = row.leadOrOwner, !person.isEmpty {
+                                    Text(person)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                if let target = row.targetDate {
+                                    Text(target.formatted(.dateTime.month(.abbreviated).day()))
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
                                 Text("\(row.issues.count)")
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
@@ -480,7 +468,11 @@ private struct LinearFoldableRow<Content: View>: View {
                     .padding(.bottom, 8)
             }
         }
-        .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(Color(nsColor: .controlBackgroundColor))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

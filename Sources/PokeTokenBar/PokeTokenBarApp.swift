@@ -141,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.delegate = self   // didShow: outside-click monitor; didClose: 호스팅 해제 + 모니터 제거
 
         observeStore()
+        observeSession()
         observeCompanionSprite()
         observeDisplaySleep()
         observePowerState()
@@ -165,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     /// Observation 기반 상태 반영 — store 의 menuTitle(=menuLines) 변경 시 재호출.
     /// (isStale 은 더 이상 추적 안 함 — 메뉴바 dim 제거로 시각 출력에 관여하지 않음.)
+    /// 세션 시계는 `observeSession` — menuTitle 은 사용량만이라 tick 마다 안 바뀐다.
     private func observeStore() {
         withObservationTracking {
             _ = store.menuTitle
@@ -173,6 +175,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 guard let self else { return }
                 self.applyState()
                 self.observeStore()
+            }
+        }
+    }
+
+    /// 펫이 꺼진 동안 메뉴바 세션 시계를 1초 tick 에 맞춘다. overlay 가 있을 땐 시계를 중복하지 않지만
+    /// 펫 토글·일시정지·종료는 여기로 받아야 applyState 가 사용량-only 로 돌아간다.
+    private func observeSession() {
+        withObservationTracking {
+            _ = sessionStore.session?.phase
+            _ = sessionStore.session?.accumulatedSeconds
+            _ = sessionStore.session?.plannedSeconds
+            _ = store.floatingPetEnabled
+            _ = companion.language
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.applyState()
+                self.observeSession()
             }
         }
     }
@@ -217,7 +237,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func applyState() {
         guard let button = statusItem.button else { return }
-        Self.applyMenuText(store.menuLines, to: button)
+        let sessionClock = MenuBarLines.sessionClock(
+            session: sessionStore.session,
+            floatingPetEnabled: store.floatingPetEnabled,
+            clock: sessionStore.clockDisplay(),
+            overtimeAbbrev: companion.l.overtimeAbbrev)
+        Self.applyMenuText(
+            MenuBarLines.compose(usageLines: store.menuLines, sessionClock: sessionClock),
+            to: button)
+        button.toolTip = MenuBarLines.toolTip(
+            identifier: sessionStore.session?.issue.identifier,
+            sessionClock: sessionClock)
         needsSpriteLayout = true   // 텍스트 길이가 바뀌면 버튼 폭이 변해 이미지 자리도 움직인다
         // stale 시각 dim 제거 — 슬립/런치 직후 refresh 완료 전 몇 초간 회색으로 보여 '고장/비활성'
         // 으로 오인되던 것 방지(사용자 반복 지적). 데이터가 오래됐다는 신호가 필요하면 팝오버
@@ -599,7 +629,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(nil)   // 해제·메뉴 애니메이션 재개는 popoverDidClose 에서
         } else {
-            navigation.reset()   // 닫혔다 열리면 항상 Home 으로 (설정 화면 잔류 방지)
+            navigation.reset()   // reopen always lands on Focus (Settings must not linger)
             buildPopoverContent()   // 열 때 호스팅 트리 생성(닫힐 때 해제)
             // LSUIElement 앱이 비활성이면 팝오버 내부 버튼 클릭이 무시됨 — show 전에 활성화 보장
             NSApp.activate(ignoringOtherApps: true)

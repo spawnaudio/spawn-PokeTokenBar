@@ -1,38 +1,57 @@
 import XCTest
 @testable import PokeTokenBar
 
-// 팝오버 내비게이션 리셋 계약 — 닫혔다 열릴 때 AppDelegate.togglePopover 가 reset()을 불러
-// 항상 Home 으로 돌아가게 한다(설정 화면 잔류 방지).
+// Popover navigation reset: AppDelegate.togglePopover calls reset() so reopen
+// always lands on Focus (Settings must not linger). Collection segment is sticky
+// except representative pick, which forces Dex.
 @MainActor
 final class PopoverNavigationTests: XCTestCase {
-    func testDefaultsToHome() {
+    func testDefaultsToFocusAndDex() {
         let nav = PopoverNavigation()
         XCTAssertFalse(nav.showSettings)
-        XCTAssertEqual(nav.tab, .home)
+        XCTAssertEqual(nav.tab, .focus)
+        XCTAssertEqual(nav.collectionSegment, .dex)
         XCTAssertFalse(nav.showingCollectionLog)
     }
 
-    func testResetReturnsToHomeFromSettings() {
+    func testRootTabsAreFocusLinearUsageCollection() {
+        XCTAssertEqual(PopoverTab.allCases, [.focus, .linear, .usage, .collection])
+    }
+
+    func testResetReturnsToFocusFromSettingsAndKeepsCollectionSegment() {
         let nav = PopoverNavigation()
         nav.showSettings = true
         nav.tab = .collection
+        nav.collectionSegment = .bag
         nav.showingCollectionLog = true
         nav.reset()
-        XCTAssertFalse(nav.showSettings)   // 설정 화면 닫힘
-        XCTAssertEqual(nav.tab, .home)     // 탭도 Home 으로
-        XCTAssertTrue(nav.showingCollectionLog, "일반 재진입은 사용자가 보던 컬렉션 세그먼트를 유지")
+        XCTAssertFalse(nav.showSettings)
+        XCTAssertEqual(nav.tab, .focus)
+        XCTAssertEqual(nav.collectionSegment, .bag, "reopen keeps Bag/Dex/Shop; only tab goes back to Focus")
+        XCTAssertTrue(nav.showingCollectionLog, "Dex vs catch-log stays unless representative pick forces Dex")
     }
 
-    func testOpenRepresentativeDexLeavesSettingsForCollection() {
+    func testOpenRepresentativeDexLeavesSettingsForCollectionDex() {
         let nav = PopoverNavigation()
         nav.showSettings = true
+        nav.collectionSegment = .shop
         nav.showingCollectionLog = true
 
         nav.openRepresentativeDex()
 
         XCTAssertFalse(nav.showSettings)
         XCTAssertEqual(nav.tab, .collection)
-        XCTAssertFalse(nav.showingCollectionLog, "포획 로그에서 설정을 열었어도 대표 선택은 도감으로 이동")
+        XCTAssertEqual(nav.collectionSegment, .dex)
+        XCTAssertFalse(nav.showingCollectionLog, "representative pick opens Dex, not catch log")
+    }
+
+    func testShowFocusLeavesSettings() {
+        let nav = PopoverNavigation()
+        nav.showSettings = true
+        nav.tab = .linear
+        nav.showFocus()
+        XCTAssertFalse(nav.showSettings)
+        XCTAssertEqual(nav.tab, .focus)
     }
 }
 
@@ -77,5 +96,23 @@ final class RepresentativeLocalizationTests: XCTestCase {
             XCTAssertEqual(l.representativeSet, item.set)
             XCTAssertFalse(l.representativeBadge.isEmpty)
         }
+    }
+
+    func testPopoverIACopyExistsInEverySupportedLanguage() {
+        for lang in AppLanguage.allCases {
+            let l = L(lang)
+            XCTAssertFalse(l.focusTab.isEmpty, "\(lang.rawValue).focusTab")
+            XCTAssertFalse(l.usageTab.isEmpty, "\(lang.rawValue).usageTab")
+            XCTAssertFalse(l.dexSegment.isEmpty, "\(lang.rawValue).dexSegment")
+            XCTAssertFalse(l.activeIssueSection.isEmpty, "\(lang.rawValue).activeIssueSection")
+            XCTAssertFalse(l.todayUsageSection.isEmpty, "\(lang.rawValue).todayUsageSection")
+            XCTAssertFalse(l.focusIdlePrompt.isEmpty, "\(lang.rawValue).focusIdlePrompt")
+            XCTAssertFalse(l.openLinearTab.isEmpty, "\(lang.rawValue).openLinearTab")
+        }
+        let en = L(.en)
+        XCTAssertEqual(en.focusIdlePrompt, "Select a Linear issue to focus")
+        XCTAssertEqual(en.openLinearTab, "Open Linear")
+        XCTAssertEqual(en.usageTab, "Usage")
+        XCTAssertEqual(en.dexSegment, "Dex")
     }
 }

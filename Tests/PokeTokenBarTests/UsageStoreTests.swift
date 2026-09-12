@@ -395,6 +395,51 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertNil(store.currentSpeechBubble)
     }
 
+    func testAnnounceTimesUpFlashesMenuWhenPetOffAndKeepsBubbleWhenPetOn() {
+        let off = makeStore(providers: [
+            FakeUsageProvider(id: "claude_code", displayName: "Claude Code", daily: todayDaily(1))
+        ])
+        off.floatingPetEnabled = false
+        off.announceTimesUp("ENG-142")
+        let l = L(off.localizationLanguage)
+        XCTAssertEqual(off.menuFlashLines, [l.timesUpFlashTitle, "ENG-142"])
+        XCTAssertEqual(off.menuLines, [l.timesUpFlashTitle, "ENG-142"])
+        XCTAssertNil(off.currentSpeechBubble, "pet-off 0:00 uses the popover card, not a leftover bubble")
+
+        let on = makeStore(providers: [
+            FakeUsageProvider(id: "claude_code", displayName: "Claude Code", daily: todayDaily(1))
+        ])
+        on.floatingPetEnabled = true
+        on.announceTimesUp("ENG-142")
+        XCTAssertTrue(on.menuFlashLines.isEmpty, "overlay hosts 0:00 — do not steal the menubar")
+        XCTAssertEqual(on.currentSpeechBubble?.title, l.timesUpBubbleTitle("ENG-142"))
+        XCTAssertEqual(on.currentSpeechBubble?.body, l.timesUpBubbleBody)
+        XCTAssertNotEqual(on.currentSpeechBubble?.isCritical, true)
+    }
+
+    func testAnnounceForfeitFlashesMenuWhenPetOffAndKeepsCriticalBubbleWhenPetOn() {
+        let missed = TokenFormatter.compact(5_000_000)
+        let off = makeStore(providers: [
+            FakeUsageProvider(id: "claude_code", displayName: "Claude Code", daily: todayDaily(1))
+        ])
+        off.floatingPetEnabled = false
+        off.announceForfeit(identifier: "ENG-142", leaveInProgressXP: 5_000_000)
+        let l = L(off.localizationLanguage)
+        XCTAssertEqual(off.menuFlashLines, [l.forfeitFlashTitle, "ENG-142"])
+        XCTAssertEqual(off.currentSpeechBubble?.title, l.forfeitBubbleTitle("ENG-142"))
+        XCTAssertEqual(off.currentSpeechBubble?.body, l.forfeitBubbleBody(missed))
+        XCTAssertEqual(off.currentSpeechBubble?.isCritical, true)
+
+        let on = makeStore(providers: [
+            FakeUsageProvider(id: "claude_code", displayName: "Claude Code", daily: todayDaily(1))
+        ])
+        on.floatingPetEnabled = true
+        on.announceForfeit(identifier: "ENG-142", leaveInProgressXP: 5_000_000)
+        XCTAssertTrue(on.menuFlashLines.isEmpty)
+        XCTAssertEqual(on.currentSpeechBubble?.isCritical, true)
+        XCTAssertEqual(on.currentSpeechBubble?.title, l.forfeitBubbleTitle("ENG-142"))
+    }
+
     /// 회귀(#56 표시 버전): compact hover tooltip must not surface a provider unused today.
     /// Claude limits exist after auth even with 0 tokens today — gate like `menuLimitLine`.
     func testHighestLimitUtilizationIgnoresProviderUnusedToday() async {
@@ -656,6 +701,18 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertTrue(three[0].contains(" · "))              // 윗줄=토큰·비용 나란히
         XCTAssertFalse(three[0].contains("Claude"))          // 윗줄에 한도 없음
         XCTAssertTrue(three[1].contains("Claude"))           // 아랫줄=한도
+        // 세션 시계가 없으면 사용량 조합은 그대로. 시계가 있으면 첫 줄이고 총 ≤2줄.
+        for tokensOn in [false, true] {
+            for costOn in [false, true] {
+                for limitOn in [false, true] {
+                    let usage = lines(tokensOn, costOn, limitOn)
+                    XCTAssertEqual(MenuBarLines.compose(usageLines: usage, sessionClock: nil), usage)
+                    let withClock = MenuBarLines.compose(usageLines: usage, sessionClock: "12:34")
+                    XCTAssertEqual(withClock.first, "12:34")
+                    XCTAssertLessThanOrEqual(withClock.count, 2)
+                }
+            }
+        }
     }
 
     // MARK: 한도 표시 방식 (used / remaining)

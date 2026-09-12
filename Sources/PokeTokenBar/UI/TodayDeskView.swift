@@ -397,6 +397,35 @@ struct SessionPromptCard: View {
     }
 }
 
+/// Pet-off host for 0:00 / check-in. Critical forfeit caption when the card isn't up.
+@MainActor
+struct PopoverSessionBanner: View {
+    @Environment(UsageStore.self) private var store
+    @Environment(FocusSessionStore.self) private var session
+
+    var body: some View {
+        if session.prompt != .none {
+            SessionPromptCard()
+        } else if let bubble = store.currentSpeechBubble,
+                  SessionPromptSurface.showsPopoverCaption(
+                    floatingPetEnabled: store.floatingPetEnabled,
+                    prompt: session.prompt,
+                    bubbleIsCritical: bubble.isCritical) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bubble.title)
+                    .font(.caption.weight(.semibold))
+                Text(bubble.body)
+                    .font(.caption2)
+            }
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+            .background(Color.red.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+}
+
 private extension Color {
     static var windowBackgroundColor: Color { Color(nsColor: .windowBackgroundColor) }
 }

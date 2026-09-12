@@ -841,6 +841,213 @@ final class FocusSessionTests: XCTestCase {
         XCTAssertEqual(stores.focus.session?.plannedSeconds, 180 * 60)
     }
 
+    // MARK: Menu bar session clock (pet off)
+
+    func testMenuBarShowsCountdownWhenSessionRunningAndPetOff() {
+        let session = runningSession()
+        let now = t0.addingTimeInterval(125)
+        let clock = session.clockDisplay(at: now)
+        XCTAssertEqual(clock.text, "47:55")
+        XCTAssertFalse(clock.overtime)
+        let line = MenuBarLines.sessionClock(
+            session: session,
+            floatingPetEnabled: false,
+            clock: clock,
+            overtimeAbbrev: L(.en).overtimeAbbrev)
+        XCTAssertEqual(line, clock.text)
+        XCTAssertEqual(
+            MenuBarLines.compose(usageLines: ["1.2M", "$3.45"], sessionClock: line),
+            [clock.text, "1.2M · $3.45"])
+        XCTAssertEqual(MenuBarLines.toolTip(identifier: session.issue.identifier, sessionClock: line), "ENG-142 47:55")
+    }
+
+    func testMenuBarHidesClockWhenFloatingPetEnabled() {
+        let session = runningSession()
+        let clock = session.clockDisplay(at: t0)
+        XCTAssertNil(MenuBarLines.sessionClock(
+            session: session,
+            floatingPetEnabled: true,
+            clock: clock,
+            overtimeAbbrev: L(.en).overtimeAbbrev))
+        XCTAssertEqual(
+            MenuBarLines.compose(usageLines: ["1.2M"], sessionClock: nil),
+            ["1.2M"])
+        XCTAssertNil(MenuBarLines.toolTip(identifier: session.issue.identifier, sessionClock: nil))
+    }
+
+    func testMenuBarHidesClockWithoutSession() {
+        XCTAssertNil(MenuBarLines.sessionClock(
+            session: nil,
+            floatingPetEnabled: false,
+            clock: (FocusClock.format(0), false),
+            overtimeAbbrev: L(.en).overtimeAbbrev))
+        XCTAssertEqual(
+            MenuBarLines.compose(usageLines: ["1.2M", "$3.45"], sessionClock: nil),
+            ["1.2M", "$3.45"])
+    }
+
+    func testMenuBarOvertimeMatchesClockDisplayAndAddsCue() {
+        var session = runningSession()
+        session = FocusTick.apply(session, now: t0.addingTimeInterval(50 * 60)).session
+        session = FocusTick.continueOvertime(session, now: t0.addingTimeInterval(50 * 60 + 1)).session
+        let now = t0.addingTimeInterval(50 * 60 + 1 + 90)
+        session = FocusTick.apply(session, now: now).session
+        let clock = session.clockDisplay(at: now)
+        XCTAssertTrue(clock.overtime)
+        XCTAssertEqual(clock.text, FocusClock.format(session.displayedSeconds(at: now)))
+        let abbrev = L(.en).overtimeAbbrev
+        let line = MenuBarLines.sessionClock(
+            session: session,
+            floatingPetEnabled: false,
+            clock: clock,
+            overtimeAbbrev: abbrev)
+        XCTAssertEqual(line, "\(clock.text) \(abbrev)")
+        XCTAssertEqual(
+            MenuBarLines.toolTip(identifier: session.issue.identifier, sessionClock: line),
+            "\(session.issue.identifier) \(clock.text) \(abbrev)")
+    }
+
+    func testMenuBarKeepsFrozenClockWhilePaused() {
+        var session = runningSession()
+        let pauseAt = t0.addingTimeInterval(10)
+        session = FocusTick.apply(session, now: pauseAt).session
+        session = FocusTick.pause(session, now: pauseAt)
+        let frozen = session.clockDisplay(at: pauseAt)
+        let later = session.clockDisplay(at: pauseAt.addingTimeInterval(60))
+        XCTAssertEqual(frozen.text, later.text)
+        XCTAssertEqual(frozen.overtime, later.overtime)
+        XCTAssertEqual(
+            MenuBarLines.sessionClock(
+                session: session,
+                floatingPetEnabled: false,
+                clock: later,
+                overtimeAbbrev: L(.en).overtimeAbbrev),
+            frozen.text)
+    }
+
+    func testMenuBarComposeNeverExceedsTwoLines() {
+        XCTAssertEqual(MenuBarLines.compose(usageLines: [], sessionClock: "12:34"), ["12:34"])
+        XCTAssertEqual(MenuBarLines.compose(usageLines: ["1.2M"], sessionClock: "12:34"), ["12:34", "1.2M"])
+        XCTAssertEqual(
+            MenuBarLines.compose(usageLines: ["1.2M", "$3"], sessionClock: "12:34"),
+            ["12:34", "1.2M · $3"])
+        XCTAssertEqual(
+            MenuBarLines.compose(usageLines: ["1.2M · $3", "Claude 40%"], sessionClock: "12:34"),
+            ["12:34", "1.2M · $3 · Claude 40%"])
+        XCTAssertEqual(MenuBarLines.compose(usageLines: ["1.2M", "$3"], sessionClock: nil), ["1.2M", "$3"])
+    }
+
+    func testPromptRoutesToPopoverWhenPetOffAndOverlayWhenPetOn() {
+        XCTAssertTrue(SessionPromptSurface.showsOnPopover(floatingPetEnabled: false))
+        XCTAssertFalse(SessionPromptSurface.showsOnOverlay(floatingPetEnabled: false))
+        XCTAssertFalse(SessionPromptSurface.showsOnPopover(floatingPetEnabled: true))
+        XCTAssertTrue(SessionPromptSurface.showsOnOverlay(floatingPetEnabled: true))
+        XCTAssertTrue(SessionPromptSurface.showsOnToday)
+
+        let stores = makeStores()
+        stores.usage.floatingPetEnabled = false
+        stores.focus.checkInMinutes = 30
+        stores.focus.pin(issue(), openDesk: false)
+        stores.focus.tick(now: t0.addingTimeInterval(30 * 60))
+        XCTAssertEqual(stores.focus.prompt, .checkIn)
+        XCTAssertTrue(SessionPromptSurface.showsOnPopover(floatingPetEnabled: stores.usage.floatingPetEnabled))
+        XCTAssertFalse(SessionPromptSurface.showsOnOverlay(floatingPetEnabled: stores.usage.floatingPetEnabled))
+
+        stores.usage.floatingPetEnabled = true
+        XCTAssertEqual(stores.focus.prompt, .checkIn, "pet-on overlay still sees the same check-in")
+        XCTAssertTrue(SessionPromptSurface.showsOnOverlay(floatingPetEnabled: true))
+        XCTAssertFalse(SessionPromptSurface.showsOnPopover(floatingPetEnabled: true))
+    }
+
+    func testZeroTimeTickFlashesMenuAndKeepsPromptWhenPetOff() {
+        let stores = makeStores()
+        stores.usage.floatingPetEnabled = false
+        stores.focus.pin(issue(), openDesk: false)
+        stores.focus.tick(now: t0.addingTimeInterval(50 * 60))
+        XCTAssertEqual(stores.focus.prompt, .zeroTime)
+        XCTAssertTrue(SessionPromptSurface.showsOnPopover(floatingPetEnabled: false))
+        let l = L(stores.usage.localizationLanguage)
+        XCTAssertEqual(stores.usage.menuFlashLines, [l.timesUpFlashTitle, "ENG-142"])
+        XCTAssertNil(stores.usage.currentSpeechBubble)
+        XCTAssertEqual(
+            MenuBarLines.compose(
+                usageLines: stores.usage.menuFlashLines,
+                sessionClock: MenuBarLines.sessionClock(
+                    session: stores.focus.session,
+                    floatingPetEnabled: false,
+                    clock: stores.focus.clockDisplay(at: t0.addingTimeInterval(50 * 60)),
+                    overtimeAbbrev: l.overtimeAbbrev)),
+            ["0:00", "\(l.timesUpFlashTitle) · ENG-142"])
+    }
+
+    func testZeroTimeTickDoesNotFlashMenuWhenPetOn() {
+        let stores = makeStores()
+        stores.usage.floatingPetEnabled = true
+        stores.focus.pin(issue(), openDesk: false)
+        stores.focus.tick(now: t0.addingTimeInterval(50 * 60))
+        XCTAssertEqual(stores.focus.prompt, .zeroTime)
+        XCTAssertTrue(SessionPromptSurface.showsOnOverlay(floatingPetEnabled: true))
+        XCTAssertFalse(SessionPromptSurface.showsOnPopover(floatingPetEnabled: true))
+        XCTAssertTrue(stores.usage.menuFlashLines.isEmpty)
+        XCTAssertEqual(
+            stores.usage.currentSpeechBubble?.title,
+            L(stores.usage.localizationLanguage).timesUpBubbleTitle("ENG-142"))
+    }
+
+    func testForfeitFlashesCriticalMenuWhenPetOff() async {
+        let stores = makeStores()
+        stores.usage.floatingPetEnabled = false
+        stores.focus.pin(issue(), openDesk: false)
+        stores.focus.requestUnfocus()
+        XCTAssertNotNil(stores.focus.forfeitPrompt)
+        await stores.focus.confirmForfeit()
+        XCTAssertNil(stores.focus.session)
+        XCTAssertEqual(stores.focus.prompt, .none)
+        let l = L(stores.usage.localizationLanguage)
+        XCTAssertEqual(stores.usage.menuFlashLines, [l.forfeitFlashTitle, "ENG-142"])
+        XCTAssertEqual(stores.usage.currentSpeechBubble?.isCritical, true)
+        XCTAssertTrue(SessionPromptSurface.showsPopoverCaption(
+            floatingPetEnabled: false,
+            prompt: stores.focus.prompt,
+            bubbleIsCritical: stores.usage.currentSpeechBubble?.isCritical == true))
+    }
+
+    func testForfeitDoesNotFlashMenuWhenPetOn() async {
+        let stores = makeStores()
+        stores.usage.floatingPetEnabled = true
+        stores.focus.pin(issue(), openDesk: false)
+        stores.focus.requestUnfocus()
+        await stores.focus.confirmForfeit()
+        XCTAssertTrue(stores.usage.menuFlashLines.isEmpty)
+        XCTAssertEqual(stores.usage.currentSpeechBubble?.isCritical, true)
+        XCTAssertFalse(SessionPromptSurface.showsPopoverCaption(
+            floatingPetEnabled: true,
+            prompt: .none,
+            bubbleIsCritical: true))
+    }
+
+    func testLinearPinSwitchesToFocusWithoutOpeningToday() {
+        let stores = makeStores()
+        var deskOpened = false
+        stores.focus.onOpenDesk = { deskOpened = true }
+        let nav = PopoverNavigation()
+        nav.tab = .linear
+        nav.pinIssueFromLinear(issue(), session: stores.focus)
+        XCTAssertEqual(nav.tab, .focus)
+        XCTAssertFalse(nav.showSettings)
+        XCTAssertFalse(deskOpened)
+        XCTAssertEqual(stores.focus.session?.issue.id, "issue-1")
+    }
+
+    func testTodayDeskPinStillOpensToday() {
+        let stores = makeStores()
+        var deskOpened = false
+        stores.focus.onOpenDesk = { deskOpened = true }
+        stores.focus.pin(issue())
+        XCTAssertTrue(deskOpened)
+        XCTAssertEqual(stores.focus.session?.issue.id, "issue-1")
+    }
+
     private func makeStores(
         clock: TimeOpenCompanionTestsClock? = nil,
         postComment: ((String, String) async -> Bool)? = nil,

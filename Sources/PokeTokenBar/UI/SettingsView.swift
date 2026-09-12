@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -120,6 +121,10 @@ struct SettingsView: View {
             // 개발자 후원 — 기능 잠금·너지 없는 푸터 링크
             footerLink("♥ Sponsor", "https://github.com/sponsors/chattymin")
             Spacer()
+            Button(l.quit) {
+                NSApplication.shared.terminate(nil)
+            }
+            .buttonStyle(.borderless)
         }
         .font(.caption2)
         .foregroundStyle(.tertiary)

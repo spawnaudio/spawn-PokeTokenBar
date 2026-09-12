@@ -192,6 +192,9 @@ struct LinearIssueCompletionStats: View {
 struct LinearFocusButton: View {
     let issue: LinearIssueSummary
     var compact: Bool = true
+    /// Today desk keeps the default (open Today). Linear tab passes false.
+    var openDeskOnPin: Bool = true
+    var onPinned: (() -> Void)? = nil
 
     @Environment(FocusSessionStore.self) private var session
     @Environment(CompanionStore.self) private var companion
@@ -201,7 +204,8 @@ struct LinearFocusButton: View {
 
     var body: some View {
         Button {
-            session.pin(issue)
+            session.pin(issue, openDesk: openDeskOnPin)
+            onPinned?()
         } label: {
             Text(isPinned ? l.focusingNow : l.focusAction)
         }
@@ -214,6 +218,7 @@ struct LinearFocusButton: View {
 @MainActor
 struct NewLinearIssueButton: View {
     var compact: Bool = true
+    var showsTitle: Bool = false
 
     @Environment(UsageStore.self) private var store
     @Environment(FocusSessionStore.self) private var session
@@ -225,7 +230,11 @@ struct NewLinearIssueButton: View {
         Button {
             session.openComposer()
         } label: {
-            Image(systemName: "plus")
+            if showsTitle {
+                Label(l.newLinearIssue, systemImage: "plus")
+            } else {
+                Image(systemName: "plus")
+            }
         }
         .buttonStyle(.borderless)
         .controlSize(compact ? .mini : .small)
