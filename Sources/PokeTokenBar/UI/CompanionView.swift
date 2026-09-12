@@ -764,12 +764,10 @@ struct CollectionView: View {
             emptyState   // 둘 다 비어 있으니 세그먼트를 그리지 않는다
         } else {
             VStack(alignment: .leading, spacing: 8) {
-                Picker("", selection: $nav.showingCollectionLog) {
-                    Text(store.l.dexTitle).tag(false)
-                    Text(store.l.catchLogTitle).tag(true)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                TahoeTabBar(selection: $nav.showingCollectionLog, items: [
+                    TahoeTabItem(false, title: store.l.dexTitle),
+                    TahoeTabItem(true, title: store.l.catchLogTitle),
+                ])
                 if nav.showingCollectionLog { catchLog } else { DexGridView(store: store) }
             }
             .frame(height: Self.contentHeight)
@@ -1043,12 +1041,19 @@ private struct PokemonDetailView: View {
     }
 
     private var individualPicker: some View {
-        Picker(store.l.pokemonIndividual, selection: $selectedInstanceID) {
+        let selected = individuals.first { $0.id == selectedInstanceID } ?? individuals.first
+        let index = selected.flatMap { entry in individuals.firstIndex { $0.id == entry.id } } ?? 0
+        let title = selected.map { "#\(index + 1) · Lv. \($0.profile?.level ?? 5)" }
+            ?? store.l.pokemonIndividual
+        return TahoePopupMenu(
+            accessibilityLabel: store.l.pokemonIndividual,
+            selectionTitle: title,
+            selection: $selectedInstanceID
+        ) {
             ForEach(Array(individuals.enumerated()), id: \.element.id) { index, entry in
                 Text("#\(index + 1) · Lv. \(entry.profile?.level ?? 5)").tag(entry.id)
             }
         }
-        .pickerStyle(.menu)
     }
 
     private func individualSection(entry: DexEntry, profile: PokemonProfile,

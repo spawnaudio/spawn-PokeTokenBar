@@ -663,6 +663,7 @@ struct ProviderTabBar: View {
                         }
                         .controlSize(.small)
                         .tahoeButtonStyle(isSelected ? .prominent : .regular)
+                        .buttonBorderShape(.capsule)
                     }
                 }
             }

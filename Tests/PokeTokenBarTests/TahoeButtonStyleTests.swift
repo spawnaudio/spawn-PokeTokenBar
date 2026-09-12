@@ -54,5 +54,43 @@ final class TahoeButtonStyleTests: XCTestCase {
         XCTAssertTrue(source.contains(".buttonStyle(.bordered)"))
         XCTAssertTrue(source.contains(".buttonStyle(.borderless)"))
         XCTAssertTrue(source.contains("GlassEffectContainer"))
+        XCTAssertTrue(source.contains("TahoeMenuLabel"))
+        XCTAssertTrue(source.contains("TahoePopupMenu"))
+        XCTAssertTrue(source.contains("TahoeTabBar"))
+        XCTAssertTrue(source.contains("TahoeChromeSymbol.menuChevron"))
+        XCTAssertTrue(source.contains("func popoverBottomBarChrome"))
+    }
+
+    func testUIPickersDoNotUseNativeMenuOrSegmentedStyles() throws {
+        let ui = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokeTokenBar/UI")
+        let enumerator = try XCTUnwrap(FileManager.default.enumerator(
+            at: ui, includingPropertiesForKeys: nil))
+        let forbidden = [".pickerStyle(.segmented)", ".pickerStyle(.menu)", ".menuIndicator(.visible)"]
+        var offenders: [String] = []
+
+        for case let url as URL in enumerator where url.pathExtension == "swift" {
+            if url.lastPathComponent == "PopoverChrome.swift" { continue }
+            let lines = try String(contentsOf: url, encoding: .utf8)
+                .split(separator: "\n", omittingEmptySubsequences: false)
+            for (index, line) in lines.enumerated() {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if forbidden.contains(where: { trimmed.contains($0) }) {
+                    offenders.append("\(url.lastPathComponent):\(index + 1)")
+                }
+            }
+        }
+
+        XCTAssertTrue(offenders.isEmpty, """
+            Tabs use TahoeTabBar and dropdowns use TahoePopupMenu / TahoeMenuLabel \
+            (glass button + chevron). Offenders: \(offenders.joined(separator: ", "))
+            """)
+    }
+
+    func testMenuChevronIsTheTahoePopupGlyph() {
+        XCTAssertEqual(TahoeChromeSymbol.menuChevron, "chevron.down")
     }
 }

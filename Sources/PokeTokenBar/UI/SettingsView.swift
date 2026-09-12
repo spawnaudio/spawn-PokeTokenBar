@@ -48,6 +48,14 @@ struct SettingsView: View {
         return "#\(species.id) \(species.name)\(species.isShiny ? " ✨" : "")"
     }
 
+    private func animationQualityTitle(_ quality: UsageStore.AnimationQuality) -> String {
+        switch quality {
+        case .powerSaver: return l.animationPowerSaver
+        case .balanced: return l.animationBalanced
+        case .smooth: return l.animationSmooth
+        }
+    }
+
     /// 세이브 봉투에 남길 출처 표기 — 어느 Mac에서 내보낸 파일인지 나중에 알아보기 위한 것.
     private static var deviceName: String {
         Host.current().localizedName ?? ProcessInfo.processInfo.hostName
@@ -154,12 +162,15 @@ struct SettingsView: View {
             groupRow {
                 Text(l.language)
                 Spacer()
-                Picker(l.language, selection: Binding(
-                    get: { companion.language },
-                    set: { companion.setLanguage($0); store.localizationLanguage = $0 })) {
+                TahoePopupMenu(
+                    accessibilityLabel: l.language,
+                    selectionTitle: companion.language.label,
+                    selection: Binding(
+                        get: { companion.language },
+                        set: { companion.setLanguage($0); store.localizationLanguage = $0 })
+                ) {
                     ForEach(AppLanguage.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
-                .labelsHidden().pickerStyle(.menu).fixedSize()
             }
             Divider()
             groupRow {
@@ -178,8 +189,9 @@ struct SettingsView: View {
                     }
                     Button(l.representativeChooseFromDex, action: onChooseRepresentative)
                 } label: {
-                    Text(representativeSelectionText).lineLimit(1).truncationMode(.tail)
+                    TahoeMenuLabel(text: representativeSelectionText)
                 }
+                .menuIndicator(.hidden)
                 .tahoeButtonStyle(.regular)
                 .controlSize(.small)
                 .frame(width: 150, alignment: .trailing)
@@ -189,10 +201,13 @@ struct SettingsView: View {
             groupRow {
                 Text(l.refreshInterval)
                 Spacer()
-                Picker(l.refreshInterval, selection: $store.refreshInterval) {
+                TahoePopupMenu(
+                    accessibilityLabel: l.refreshInterval,
+                    selectionTitle: l.intervalLabel(store.refreshInterval),
+                    selection: $store.refreshInterval
+                ) {
                     ForEach(UsageStore.intervalPresets, id: \.value) { Text(l.intervalLabel($0.value)).tag($0.value) }
                 }
-                .labelsHidden().pickerStyle(.menu).fixedSize()
             }
             Divider()
             groupRow {
@@ -202,22 +217,24 @@ struct SettingsView: View {
                     Text(l.animationQualityHint).font(.caption2).foregroundStyle(.tertiary)
                 }
                 Spacer()
-                Picker(l.animationQualityLabel, selection: $store.animationQuality) {
+                TahoePopupMenu(
+                    accessibilityLabel: l.animationQualityLabel,
+                    selectionTitle: animationQualityTitle(store.animationQuality),
+                    selection: $store.animationQuality
+                ) {
                     Text(l.animationPowerSaver).tag(UsageStore.AnimationQuality.powerSaver)
                     Text(l.animationBalanced).tag(UsageStore.AnimationQuality.balanced)
                     Text(l.animationSmooth).tag(UsageStore.AnimationQuality.smooth)
                 }
-                .labelsHidden().pickerStyle(.menu).fixedSize()
             }
             Divider()
             groupRow {
                 Text(l.limitDisplayModeLabel)
                 Spacer()
-                Picker(l.limitDisplayModeLabel, selection: $store.limitDisplayMode) {
-                    Text(l.limitDisplayUsed).tag(UsageStore.LimitDisplayMode.used)
-                    Text(l.limitDisplayRemaining).tag(UsageStore.LimitDisplayMode.remaining)
-                }
-                .labelsHidden().pickerStyle(.segmented).fixedSize()
+                TahoeTabBar(selection: $store.limitDisplayMode, size: .mini, items: [
+                    TahoeTabItem(.used, title: l.limitDisplayUsed),
+                    TahoeTabItem(.remaining, title: l.limitDisplayRemaining),
+                ])
             }
             Divider()
             groupRow {
@@ -475,15 +492,18 @@ struct SettingsView: View {
             groupRow {
                 Text(l.sessionKeyOrganizationLabel)
                 Spacer()
-                Picker(l.sessionKeyOrganizationLabel, selection: Binding(
-                    get: { store.sessionKeySelectedOrgID ?? "" },
-                    set: { id in Task { await store.selectSessionOrganization(id) } })
+                TahoePopupMenu(
+                    accessibilityLabel: l.sessionKeyOrganizationLabel,
+                    selectionTitle: store.sessionKeyOrganizations.first { $0.id == store.sessionKeySelectedOrgID }?.name
+                        ?? l.sessionKeyOrganizationLabel,
+                    selection: Binding(
+                        get: { store.sessionKeySelectedOrgID ?? "" },
+                        set: { id in Task { await store.selectSessionOrganization(id) } })
                 ) {
                     ForEach(store.sessionKeyOrganizations) { org in
                         Text(org.name).tag(org.id)
                     }
                 }
-                .labelsHidden().frame(maxWidth: 220)
             }
         }
         if let sessionKeyError = store.sessionKeyError {
@@ -652,12 +672,16 @@ struct SettingsView: View {
                         HStack {
                             Text(l.customScanProviderLabel).font(.caption)
                             Spacer()
-                            Picker(l.customScanProviderLabel, selection: $selectedScanProviderID) {
+                            TahoePopupMenu(
+                                accessibilityLabel: l.customScanProviderLabel,
+                                selectionTitle: store.registeredProviders.first { $0.id == selectedScanProviderID }?.displayName
+                                    ?? l.customScanProviderLabel,
+                                selection: $selectedScanProviderID
+                            ) {
                                 ForEach(store.registeredProviders, id: \.id) { provider in
                                     Text(provider.displayName).tag(provider.id)
                                 }
                             }
-                            .labelsHidden().pickerStyle(.menu).fixedSize()
                         }
                         TextField(l.customScanRootsPlaceholder, text: $customScanDraft, axis: .vertical)
                             .textFieldStyle(.roundedBorder).font(.caption)

@@ -19,24 +19,28 @@ struct LinearIssueStatusPicker: View {
         let selectedID = issue.stateId
             ?? states.first(where: { $0.name == issue.stateName })?.id
             ?? ""
-        Picker("", selection: Binding(
-            get: { selectedID },
-            set: { newID in
-                guard let state = states.first(where: { $0.id == newID }) else { return }
-                Task { await changeStatus(to: state) }
-            }
-        )) {
+        let title = states.first(where: { $0.id == selectedID })?.name
+            ?? issue.stateName
+            ?? l.linearStatusUnknown
+        return TahoePopupMenu(
+            accessibilityLabel: l.linearStatusHelp,
+            selectionTitle: title,
+            selection: Binding(
+                get: { selectedID },
+                set: { newID in
+                    guard let state = states.first(where: { $0.id == newID }) else { return }
+                    Task { await changeStatus(to: state) }
+                }
+            ),
+            size: compact ? .mini : .small
+        ) {
             if states.isEmpty {
-                Text(issue.stateName ?? l.linearStatusUnknown).tag(selectedID)
+                Text(title).tag(selectedID)
             }
             ForEach(states) { state in
                 Text(state.name).tag(state.id)
             }
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .controlSize(compact ? .mini : .small)
-        .fixedSize()
         .disabled(states.isEmpty || store.updatingLinearIssueID != nil)
         .opacity(busy ? 0.45 : 1)
         .overlay {
@@ -354,8 +358,9 @@ struct FocusTimerControls: View {
                     }
                 }
             } label: {
-                Text(l.addTime)
+                TahoeMenuLabel(text: l.addTime)
             }
+            .menuIndicator(.hidden)
             .disabled(!session.canAddRemainingTime)
             Button(l.unfocusAction) { session.requestUnfocus() }
                 .foregroundStyle(.red)

@@ -128,39 +128,60 @@ struct LinearIssueComposerView: View {
                     )
             }
             labeled(l.linearIssueTeam) {
-                Picker(l.linearIssueTeam, selection: $teamID) {
+                TahoePopupMenu(
+                    accessibilityLabel: l.linearIssueTeam,
+                    selectionTitle: catalog?.teams.first { $0.id == teamID }.map(teamKeyLabel) ?? l.linearIssueTeam,
+                    selection: $teamID,
+                    size: .regular,
+                    expands: true
+                ) {
                     ForEach(catalog?.teams ?? []) { team in
                         Text(teamKeyLabel(team)).tag(team.id)
                     }
                 }
-                .labelsHidden()
                 .onChange(of: teamID) { _, _ in applyTeamDefaults() }
             }
             labeled(l.linearIssueProject) {
-                Picker(l.linearIssueProject, selection: $projectID) {
+                TahoePopupMenu(
+                    accessibilityLabel: l.linearIssueProject,
+                    selectionTitle: teamProjects.first { $0.id == projectID }?.name ?? l.linearIssueNoProject,
+                    selection: $projectID,
+                    size: .regular,
+                    expands: true
+                ) {
                     Text(l.linearIssueNoProject).tag("")
                     ForEach(teamProjects) { project in
                         Text(project.name).tag(project.id)
                     }
                 }
-                .labelsHidden()
             }
             labeled(l.linearIssueAssignee) {
-                Picker(l.linearIssueAssignee, selection: $assigneeID) {
+                TahoePopupMenu(
+                    accessibilityLabel: l.linearIssueAssignee,
+                    selectionTitle: catalog?.users.first { $0.id == assigneeID }.map(assigneeLabel)
+                        ?? l.linearIssueUnassigned,
+                    selection: $assigneeID,
+                    size: .regular,
+                    expands: true
+                ) {
                     Text(l.linearIssueUnassigned).tag("")
                     ForEach(catalog?.users ?? []) { user in
                         Text(assigneeLabel(user)).tag(user.id)
                     }
                 }
-                .labelsHidden()
             }
             labeled(l.linearIssueStatus) {
-                Picker(l.linearIssueStatus, selection: $stateID) {
+                TahoePopupMenu(
+                    accessibilityLabel: l.linearIssueStatus,
+                    selectionTitle: selectedTeam?.states.first { $0.id == stateID }?.name ?? l.linearIssueStatus,
+                    selection: $stateID,
+                    size: .regular,
+                    expands: true
+                ) {
                     ForEach(selectedTeam?.states ?? []) { state in
                         Text(state.name).tag(state.id)
                     }
                 }
-                .labelsHidden()
             }
             labeled(l.linearIssueLabels) {
                 LinearIssueLabelsMenu(
@@ -319,10 +340,10 @@ struct LinearIssueLabelsMenu: View {
                 }
             }
         } label: {
-            Text(title)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            TahoeMenuLabel(text: title, expands: true)
         }
-        .menuIndicator(.visible)
+        .menuIndicator(.hidden)
+        .tahoeButtonStyle(.regular)
         .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(labels.isEmpty)
         .accessibilityLabel(l.linearIssueLabels)
