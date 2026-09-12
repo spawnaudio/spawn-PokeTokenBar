@@ -21,20 +21,40 @@ final class MenuBarPanelTests: XCTestCase {
     }
 
     @MainActor
-    func testConfigureMakesAStickyResizableWindow() {
+    func testConfigureAttachedLocksUnderMenuBar() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 640),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: true)
+        MenuBarPanelMetrics.configure(window, detached: false)
+        XCTAssertFalse(window.isMovable)
+        XCTAssertFalse(window.isMovableByWindowBackground)
+        XCTAssertFalse(window.hidesOnDeactivate)
+        XCTAssertTrue(window.styleMask.contains(.borderless))
+        XCTAssertFalse(window.styleMask.contains(.titled))
+        XCTAssertTrue(window.styleMask.contains(.resizable))
+        XCTAssertEqual(window.contentMinSize.width, 360)
+        XCTAssertEqual(window.contentMaxSize.width, 720)
+    }
+
+    @MainActor
+    func testConfigureDetachedIsMovableTitledWindow() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 640),
             styleMask: [.borderless],
             backing: .buffered,
             defer: true)
-        MenuBarPanelMetrics.configure(window)
-        XCTAssertFalse(window.hidesOnDeactivate)
-        XCTAssertFalse(window.isReleasedWhenClosed)
-        XCTAssertTrue(window.styleMask.contains(.resizable))
+        MenuBarPanelMetrics.configure(window, detached: true)
+        XCTAssertTrue(window.isMovable)
         XCTAssertTrue(window.styleMask.contains(.titled))
         XCTAssertTrue(window.styleMask.contains(.closable))
-        XCTAssertEqual(window.contentMinSize.width, 360)
-        XCTAssertEqual(window.contentMaxSize.width, 720)
+        XCTAssertTrue(window.styleMask.contains(.resizable))
+    }
+
+    func testOnlyTheButtonDetachesFromTheMenuBar() {
+        XCTAssertTrue(MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: false))
+        XCTAssertFalse(MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: true))
     }
 
     func testClampedContentSizePinsToMinAndMax() {

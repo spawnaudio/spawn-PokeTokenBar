@@ -126,6 +126,12 @@ final class FocusSessionStore {
         if openDesk { self.openDesk() }
     }
 
+    /// Start the overlay/Focus clock without a Linear issue. No-op if a session is already running.
+    func startPomodoro() {
+        guard session == nil else { return }
+        startPinned(FocusPinnedIssue.pomodoro(title: companion.l.pomodoroTitle))
+    }
+
     func requestUnfocus() {
         guard session != nil else { return }
         presentForfeit(pending: .idle)
@@ -386,6 +392,7 @@ final class FocusSessionStore {
     }
 
     private func postLinearComment(issueID: String, body: String) async -> Bool {
+        if session?.issue.isPomodoro == true { return false }
         if let postComment {
             return await postComment(issueID, body)
         }
@@ -400,6 +407,10 @@ final class FocusSessionStore {
     }
 
     private func start(_ issue: LinearIssueSummary) {
+        startPinned(FocusPinnedIssue(issue))
+    }
+
+    private func startPinned(_ issue: FocusPinnedIssue) {
         let now = clock()
         companion.setTimeOpenXPSuspended(true)
         sessionGrantedXP = 0
@@ -409,7 +420,7 @@ final class FocusSessionStore {
         isComposingNote = false
         notePostFailed = false
         session = FocusSession.start(
-            issue: FocusPinnedIssue(issue),
+            issue: issue,
             plannedMinutes: plannedMinutes,
             checkInMinutes: checkInMinutes,
             now: now)

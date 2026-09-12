@@ -28,14 +28,18 @@ struct SessionIslandView: View {
                 if !store.floatingPetIslandFolded {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
-                            LinearIssueIDButton(identifier: current.issue.identifier, url: current.issue.url)
+                            if !current.issue.isPomodoro {
+                                LinearIssueIDButton(identifier: current.issue.identifier, url: current.issue.url)
+                            }
                             Text(current.issue.title)
                                 .font(.caption)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                             Spacer(minLength: 0)
-                            NewLinearIssueButton()
-                            SessionNoteButton()
+                            if !current.issue.isPomodoro {
+                                NewLinearIssueButton()
+                                SessionNoteButton()
+                            }
                         }
                         HStack(spacing: 6) {
                             Text(clock.text)
@@ -60,10 +64,12 @@ struct SessionIslandView: View {
                             .buttonBorderShape(.circle)
                             .disabled(current.phase == .awaitingChoice)
                             .help(current.userPaused || current.phase == .paused ? l.resumeTimer : l.pauseTimer)
-                            LinearIssueStatusPicker(issue: issue)
+                            if !current.issue.isPomodoro {
+                                LinearIssueStatusPicker(issue: issue)
+                            }
                         }
                         FocusTimerControls()
-                        if session.isComposingNote {
+                        if session.isComposingNote, !current.issue.isPomodoro {
                             SessionNoteComposer()
                         }
                     }

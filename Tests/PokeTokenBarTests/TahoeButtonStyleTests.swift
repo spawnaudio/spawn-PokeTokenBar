@@ -1,10 +1,9 @@
 import XCTest
 @testable import PokeTokenBar
 
-/// Action buttons in the UI sources must go through `tahoeButtonStyle` so macOS 26+
-/// picks up Liquid Glass and older macOS keeps bordered / borderless fallbacks.
-/// Raw `.bordered` / `.borderedProminent` / `.borderless` are only allowed inside
-/// that helper (PopoverChrome.swift). List rows, dex cells, and disclosures stay `.plain`.
+/// Action buttons in the UI sources must go through `tahoeButtonStyle` so Linear
+/// filled / chip / plain chrome stays in one place. Raw `.bordered` / `.glass`
+/// styles are not used on information surfaces.
 final class TahoeButtonStyleTests: XCTestCase {
     func testUIButtonsUseTahoeHelperInsteadOfRawBorderedStyles() throws {
         let ui = URL(fileURLWithPath: #filePath)
@@ -36,12 +35,12 @@ final class TahoeButtonStyleTests: XCTestCase {
         }
 
         XCTAssertTrue(offenders.isEmpty, """
-            Use tahoeButtonStyle(.prominent/.regular/.accessory) so Tahoe glass and older \
-            macOS fallbacks stay in one place. Offenders: \(offenders.joined(separator: ", "))
+            Use tahoeButtonStyle(.prominent/.regular/.accessory) so Linear chrome stays in one \
+            place. Offenders: \(offenders.joined(separator: ", "))
             """)
     }
 
-    func testPopoverChromeOwnsGlassAndFallbackStyles() throws {
+    func testPopoverChromeOwnsLinearChrome() throws {
         let chrome = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -49,11 +48,10 @@ final class TahoeButtonStyleTests: XCTestCase {
             .appendingPathComponent("Sources/PokeTokenBar/UI/PopoverChrome.swift")
         let source = try String(contentsOf: chrome, encoding: .utf8)
         XCTAssertTrue(source.contains("func tahoeButtonStyle"))
-        XCTAssertTrue(source.contains(".glassProminent"))
-        XCTAssertTrue(source.contains(".buttonStyle(.borderedProminent)"))
-        XCTAssertTrue(source.contains(".buttonStyle(.bordered)"))
-        XCTAssertTrue(source.contains(".buttonStyle(.borderless)"))
-        XCTAssertTrue(source.contains("GlassEffectContainer"))
+        XCTAssertFalse(source.contains(".glassProminent"))
+        XCTAssertFalse(source.contains(".buttonStyle(.glass)"))
+        XCTAssertFalse(source.contains("GlassEffectContainer"))
+        XCTAssertFalse(source.contains("glassEffect"))
         XCTAssertTrue(source.contains("TahoeMenuLabel"))
         XCTAssertTrue(source.contains("TahoePopupMenu"))
         XCTAssertTrue(source.contains("TahoeTabBar"))
@@ -65,6 +63,11 @@ final class TahoeButtonStyleTests: XCTestCase {
         XCTAssertTrue(source.contains("struct LinearPropertyRow"))
         XCTAssertTrue(source.contains(".linearChipChrome(expands: expands)"))
         XCTAssertTrue(source.contains(".linearSegmentChrome(selected: selected)"))
+        XCTAssertTrue(source.contains("Color.primary.opacity(0.14)"))
+        XCTAssertTrue(source.contains("detachMenuBarPanel") || source.contains("menuBarPanelDetached"))
+        XCTAssertFalse(
+            source.contains("selected ? Color.accentColor"),
+            "selected tabs must use Linear fill, not accent tint")
         XCTAssertFalse(
             popupMenuContainsTahoeButtonStyle(source),
             "TahoePopupMenu must stay a quiet chip, not a glass button")
@@ -101,6 +104,11 @@ final class TahoeButtonStyleTests: XCTestCase {
 
     func testMenuChevronIsTheTahoePopupGlyph() {
         XCTAssertEqual(TahoeChromeSymbol.menuChevron, "chevron.down")
+    }
+
+    @MainActor
+    func testCompanionHeaderSpriteIsLargeAndUnboxed() {
+        XCTAssertEqual(CompanionHeader.spriteSize, 120)
     }
 
     func testLinearInformationSurfacesStayQuietAndUnboxed() throws {

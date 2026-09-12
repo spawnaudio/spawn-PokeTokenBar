@@ -14,7 +14,7 @@ Locked with the popover IA (2026-09-12). Today is still a titled `NSWindow`, not
 
 Identifier **`PokeTokenBar.TodayDesk`** (LaunchWindowPolicy unchanged). Autosave `PokeTokenBarTodayDesk` stores the **window frame only**. Sidebar widths and collapse flags are separate UserDefaults keys (see Resize / collapse). Style: titled, closable, miniaturizable, resizable. Default **920×680**, minimum width fits three columns (~860pt): left 212 + center ≥360 + right 232 + splitter strips + padding. Closing Today does **not** stop the session. Collapsing a sidebar gives that space to the center; the window min size stays the three-column width so frame autosave cannot shrink below the clock.
 
-Chrome matches the menu-bar panel: system light/dark, `NSVisualEffectView` / `.ultraThinMaterial`, ~12pt continuous hairline cards on the hero/inspector panels, SF Pro, caption2 tertiary labels, large rounded monospaced clock, muted Linear IDs + status dots. Tahoe glass (`#available(macOS 26)`) only on **Pause** and **Mark done**. Pin/completed lists are unboxed rows. The inspector uses muted-label / bright-value property rows (`LinearPropertyRow`). The menu-bar panel is a smaller sticky window (360–720pt), not a fifth popover tab and not this desk.
+Chrome matches the menu-bar panel: system light/dark, `NSVisualEffectView`, ~12pt continuous hairline cards on the hero/inspector panels, SF Pro, caption2 tertiary labels, large rounded monospaced clock, muted Linear IDs + status dots. Pause / Mark done are Linear filled chips (`tahoeButtonStyle(.prominent)`), not glass. Pin/completed lists are unboxed rows. The inspector uses muted-label / bright-value property rows (`LinearPropertyRow`). A pomodoro session (no Linear issue) hides ID, status, notes, and Mark done in the hero; the inspector stays empty. The menu-bar panel is a smaller window (360–720pt) that attaches under the status item unless the footer detach button undocks it — not a fifth popover tab and not this desk.
 
 No Quit. Trailing refresh lives in the left header.
 
@@ -29,7 +29,7 @@ No Quit. Trailing refresh lives in the left header.
 
 **Left** — navigation + pin list (Linear-like). Date / Today title. In-progress issues (status dot, title, muted ID); click title to Focus (`openDesk: true`). Pinned row uses a quiet filled surface, not an accent-tinted card. Nested **Completed today** if any. New issue + same composer. Planned / check-in duration pickers as property rows in the sidebar footer. No Projects / Initiatives boards (those stay on the popover Linear tab). Default **212pt**, resizable/collapsible (see below).
 
-**Center** — issue + clock as the star (no companion HQ). ACTIVE ISSUE id + title, huge remaining/OT clock, Pause / Open issue / Mark done / status, timer controls, notes, then 0:00 / check-in / forfeit / reset prompts. Empty: Focus idle copy plus “pin from the left list.”
+**Center** — issue + clock as the star (no companion HQ). ACTIVE ISSUE id + title (or Pomodoro title with no ID), huge remaining/OT clock, Pause / Open issue / Mark done / status, timer controls, notes, then 0:00 / check-in / forfeit / reset prompts. Empty: Focus idle copy, **Start pomodoro**, and “pin from the left list.”
 
 **Right** — inspector + log. Pinned issue metadata already fetched as property rows (muted 72pt label, brighter value): status, team, project, assignee, labels, estimate, due (hide empty). Today’s log (sessions, check-ins, notes, forfeits) + drift count. Forfeit rows stay red. No calendar rail or health charts. Default **232pt**, resizable/collapsible (see below).
 

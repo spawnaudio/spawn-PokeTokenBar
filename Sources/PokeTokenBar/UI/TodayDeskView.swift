@@ -275,6 +275,9 @@ struct TodayDeskView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Button(l.startPomodoro) { session.startPomodoro() }
+                .tahoeButtonStyle(.prominent)
+                .controlSize(.regular)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .popoverCard()
@@ -287,12 +290,14 @@ struct TodayDeskView: View {
         let canMarkDone = issue.completedStateId != nil
             || issue.teamStates.contains { $0.type.lowercased() == "completed" }
         return VStack(alignment: .leading, spacing: 12) {
-            PopoverSectionLabel(text: l.activeIssueSection)
+            PopoverSectionLabel(text: current.issue.isPomodoro ? l.pomodoroTitle : l.activeIssueSection)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                LinearIssueIDButton(
-                    identifier: current.issue.identifier,
-                    url: current.issue.url,
-                    style: .callout.weight(.medium))
+                if !current.issue.isPomodoro {
+                    LinearIssueIDButton(
+                        identifier: current.issue.identifier,
+                        url: current.issue.url,
+                        style: .callout.weight(.medium))
+                }
                 Text(current.issue.title)
                     .font(.title2.weight(.semibold))
                     .lineLimit(3)
@@ -332,24 +337,28 @@ struct TodayDeskView: View {
                     .tahoeButtonStyle(.accessory)
                     .controlSize(.regular)
                 }
-                FocusMarkDoneButton(title: l.markDone, disabled: !canMarkDone) {
-                    Task { await session.markIssueDone() }
+                if !current.issue.isPomodoro {
+                    FocusMarkDoneButton(title: l.markDone, disabled: !canMarkDone) {
+                        Task { await session.markIssueDone() }
+                    }
+                    Spacer(minLength: 4)
+                    LinearIssueStatusPicker(issue: issue, compact: false)
                 }
-                Spacer(minLength: 4)
-                LinearIssueStatusPicker(issue: issue, compact: false)
             }
 
             FocusTimerControls(compact: false)
-            HStack {
-                SessionNoteButton(compact: false)
-                Spacer()
-            }
-            if session.isComposingNote {
-                SessionNoteComposer(compact: false)
-            } else if session.notePostFailed {
-                Text(l.linearCommentFailed)
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+            if !current.issue.isPomodoro {
+                HStack {
+                    SessionNoteButton(compact: false)
+                    Spacer()
+                }
+                if session.isComposingNote {
+                    SessionNoteComposer(compact: false)
+                } else if session.notePostFailed {
+                    Text(l.linearCommentFailed)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
             }
 
             if let warning = session.forfeitPrompt {
@@ -378,7 +387,7 @@ struct TodayDeskView: View {
 
     private var inspector: some View {
         let issue: LinearIssueSummary? = {
-            guard let current = session.session else { return nil }
+            guard let current = session.session, !current.issue.isPomodoro else { return nil }
             return store.linearIssue(id: current.issue.id) ?? current.issue.summary
         }()
         return VStack(alignment: .leading, spacing: 8) {

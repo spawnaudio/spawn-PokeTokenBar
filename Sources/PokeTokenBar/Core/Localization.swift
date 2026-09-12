@@ -40,6 +40,14 @@ struct L {
           "Wähle ein Linear-Issue zum Fokussieren")
     }
     var openLinearTab: String { t("Linear 열기", "Open Linear", "Linearを開く", "Abrir Linear", "Ouvrir Linear", "Abrir Linear", "Linear öffnen") }
+    var pomodoroTitle: String { t("포모도로", "Pomodoro", "ポモドーロ", "Pomodoro", "Pomodoro", "Pomodoro", "Pomodoro") }
+    var startPomodoro: String { t("포모도로 시작", "Start pomodoro", "ポモドーロを開始", "Iniciar pomodoro", "Démarrer le pomodoro", "Iniciar pomodoro", "Pomodoro starten") }
+    var detachMenuBarPanel: String {
+        t("메뉴바에서 분리", "Detach from menu bar", "メニューバーから切り離す", "Separar de la barra de menús", "Détacher de la barre des menus", "Desanexar da barra de menus", "Von der Menüleiste lösen")
+    }
+    var attachMenuBarPanel: String {
+        t("메뉴바로 되돌리기", "Snap back to menu bar", "メニューバーに戻す", "Volver a la barra de menús", "Réattacher à la barre des menus", "Encaixar de volta na barra de menus", "An die Menüleiste andocken")
+    }
 
     var costUnavailable: String { t("계산 불가", "Unavailable", "計算不可", "No disponible", "Indisponible", "Indisponível", "Nicht verfügbar") }
     var costEstimateHint: String { t("모델 단가로 환산한 추정 비용입니다. 구독료나 실제 청구액이 아닙니다.", "Estimated from model token rates; not a subscription fee or invoice. Service-tier and other unlogged charges are excluded.", "モデル単価による推定です。購読料や実際の請求額ではありません。", "Estimación por tarifas del modelo; no es la cuota ni la factura real.", "Estimation selon les tarifs du modèle, pas un abonnement ni une facture.", "Estimativa pelas tarifas do modelo; não é assinatura nem fatura.", "Schätzung anhand der Modellpreise, keine Abogebühr oder Rechnung.") }

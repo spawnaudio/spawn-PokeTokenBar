@@ -16,19 +16,37 @@ enum MenuBarPanelMetrics {
     static let maxWidth: CGFloat = 720
     static let maxHeight: CGFloat = 660
     static let statusItemGap: CGFloat = 6
+    static let detachedKey = "menuBarPanelDetached"
 
     static var defaultContentSize: NSSize {
         NSSize(width: defaultWidth, height: defaultHeight)
     }
 
+    static var attachedStyleMask: NSWindow.StyleMask { [.borderless, .resizable] }
+    static var detachedStyleMask: NSWindow.StyleMask { [.titled, .closable, .miniaturizable, .resizable] }
+
+    /// Dragging does not detach. Only the in-panel button does.
+    static func shouldPlaceBelowStatusItem(detached: Bool) -> Bool { !detached }
+
     @MainActor
-    static func configure(_ window: NSWindow) {
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+    static func configure(_ window: NSWindow, detached: Bool) {
+        window.styleMask = detached ? detachedStyleMask : attachedStyleMask
+        window.isMovable = detached
+        window.isMovableByWindowBackground = detached
+        window.hasShadow = true
         window.hidesOnDeactivate = false
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
         window.contentMinSize = NSSize(width: minWidth, height: minHeight)
         window.contentMaxSize = NSSize(width: maxWidth, height: maxHeight)
+        window.setFrameAutosaveName(detached ? LaunchWindowPolicy.menuBarPanelAutosaveName : "")
+        window.isOpaque = detached
+        window.backgroundColor = detached ? .windowBackgroundColor : .clear
+        if let view = window.contentView {
+            view.wantsLayer = true
+            view.layer?.cornerRadius = detached ? 0 : 12
+            view.layer?.masksToBounds = !detached
+        }
     }
 
     static func clampedContentSize(_ size: NSSize) -> NSSize {
@@ -66,6 +84,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     private let updater: UpdateChecker
     private let navigation: PopoverNavigation
     private var window: NSWindow?
+    private weak var statusButton: NSStatusBarButton?
     var onVisibilityChange: (() -> Void)?
 
     init(
@@ -81,6 +100,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         self.updater = updater
         self.navigation = navigation
         super.init()
+        observeDetach()
     }
 
     var isShown: Bool { window?.isVisible == true }
@@ -99,6 +119,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
 
     /// Pet / deep-link: show or bring forward. Does not close an already-open panel.
     func present(from button: NSStatusBarButton?, resetNavigation: Bool) {
+        if let button { statusButton = button }
         if window?.isMiniaturized == true || isShown {
             presentExisting()
             return
@@ -108,8 +129,9 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         if window == nil { window = makeWindow() }
         if window?.contentView == nil { window?.contentView = hostedView() }
         applyTitle()
+        applyChrome()
         clampContentSize()
-        if let button, shouldPlaceBelowStatusItem {
+        if let button, MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: usage.menuBarPanelDetached) {
             place(below: button)
         }
         window?.makeKeyAndOrderFront(nil)
@@ -125,13 +147,13 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         onVisibilityChange?()
     }
 
-    private var shouldPlaceBelowStatusItem: Bool {
-        window?.frame.origin == .zero
-    }
-
     private func presentExisting() {
         NSApp.activate(ignoringOtherApps: true)
         window?.deminiaturize(nil)
+        applyChrome()
+        if let statusButton, MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: usage.menuBarPanelDetached) {
+            place(below: statusButton)
+        }
         window?.makeKeyAndOrderFront(nil)
         onVisibilityChange?()
     }
@@ -151,14 +173,13 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: MenuBarPanelMetrics.defaultContentSize),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: MenuBarPanelMetrics.attachedStyleMask,
             backing: .buffered,
             defer: false)
-        MenuBarPanelMetrics.configure(window)
         window.identifier = NSUserInterfaceItemIdentifier(LaunchWindowPolicy.menuBarPanelIdentifier)
-        window.setFrameAutosaveName(LaunchWindowPolicy.menuBarPanelAutosaveName)
         window.delegate = self
         window.contentView = hostedView()
+        MenuBarPanelMetrics.configure(window, detached: usage.menuBarPanelDetached)
         return window
     }
 
@@ -166,6 +187,29 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         window?.title = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? "PokeTokenBar"
+    }
+
+    private func applyChrome() {
+        guard let window else { return }
+        MenuBarPanelMetrics.configure(window, detached: usage.menuBarPanelDetached)
+        applyTitle()
+    }
+
+    private func observeDetach() {
+        withObservationTracking {
+            _ = usage.menuBarPanelDetached
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.applyChrome()
+                if let statusButton = self.statusButton,
+                   MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: self.usage.menuBarPanelDetached)
+                {
+                    self.place(below: statusButton)
+                }
+                self.observeDetach()
+            }
+        }
     }
 
     private func clampContentSize() {

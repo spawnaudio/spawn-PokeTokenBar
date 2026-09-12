@@ -3,7 +3,7 @@ summary: "Locked popover IA: Focus · Linear · Usage · Collection, nested Line
 read_when:
   - Changing popover tabs, bottom bar, Focus/Usage/Collection layout
   - Changing Linear pin, nested Linear filters, or Collection segments
-  - Restyling popover chrome (glass, cards, menu-bar panel size)
+  - Restyling popover chrome (Linear chips, cards, menu-bar panel attach/detach)
   - Changing the Today window (dual sidebars — see today-desk-sidebars.md)
 ---
 
@@ -15,23 +15,31 @@ This file lives under `docs/reference/` because the repo publishes only that doc
 
 ## Root chrome
 
-Sticky **NSWindow** (not a transient `NSPopover`). Click-outside and focus loss do **not** close it. Status-item click toggles; the close button and pet/open paths bring it forward if already shown. Hosting is still torn down on close (energy).
+**NSWindow** (not a transient `NSPopover`). Click-outside and focus loss do **not** close it. Status-item click toggles visibility; the close button and pet/open paths bring it forward if already shown. Hosting is still torn down on close (energy).
 
-Default size **360×640**. Resizable: min **360×520**, max **720×660** (Today is 920×680). Frame autosave `PokeTokenBarMenuBarPanel`. System light/dark. `NSVisualEffectView` material `.popover`. Cards: ~12pt continuous corners and a hairline. Lists stay **opaque and unboxed** — rows use hairline dividers and a hover fill, not a card per item. Tahoe glass (`#available(macOS 26, *)`) is only on the **bottom bar**, Focus **Pause**, and **Mark done**. Sub-tabs are quiet selected pills (`TahoeTabBar` / `linearSegmentChrome`). Dropdowns are quiet bordered chips (`TahoePopupMenu` / `linearChipChrome`), not glass. Issue IDs are muted text, not pills. SF Pro. Caption2 tertiary section labels. Clock: large rounded `monospacedDigit`.
+**Attached (default).** Borderless, not movable, always placed under the status item. Dragging does **not** undock it. Rounded 12pt content, `NSVisualEffectView` material `.popover`.
+
+**Detached.** Only the footer detach button undocks. Then it is a titled, movable, resizable window with frame autosave `PokeTokenBarMenuBarPanel`. The same button snaps it back under the status item and locks it again.
+
+Default size **360×640**. Resizable: min **360×520**, max **720×660** (Today is 920×680). System light/dark. Cards: ~12pt continuous corners, `Color.primary` fill ~0.06 and a hairline. Lists stay **opaque and unboxed** — rows use hairline dividers and a hover fill, not a card per item. Sub-tabs are quiet selected pills (`TahoeTabBar` / `linearSegmentChrome`: filled control surface, brighter text, soft hairline). Dropdowns are quiet bordered chips (`TahoePopupMenu` / `linearChipChrome`). Issue IDs are muted text, not pills. Pause / Mark done / primary actions use the same filled Linear chip (`tahoeButtonStyle(.prominent)`). SF Pro. Caption2 tertiary section labels. Clock: large rounded `monospacedDigit`.
 
 Compact layout tests still use `PopoverMetrics.width` (360). Live width is `\.popoverContentWidth`.
 
+Do not restyle Collection / Dex / Shop **content** as Linear except the shared segment pills. Keep system light/dark via semantic `Color.primary` opacities — do not lock a Nordic Gray / Inter dark-only theme.
+
 ## Bottom bar
 
-Four labeled tabs (symbol + caption): **Focus · Linear · Usage · Collection**. Then icon-only **Today** (calendar) and **Settings**. Quit lives in Settings, not on the bar. Refresh lives on Usage and Linear only.
+Four labeled tabs (symbol + caption): **Focus · Linear · Usage · Collection**. Selected tab = Linear filled grey + hairline + primary text, **not** `Color.accentColor`. Then icon-only **detach/attach**, **Today** (calendar), and **Settings**. Quit lives in Settings, not on the bar. Refresh lives on Usage and Linear only.
 
 Reopening from hidden always lands on **Focus** (`PopoverNavigation.reset()`). Clicking outside does not hide the panel, so the current tab stays. Settings remains an in-window swap, not a sheet.
 
 ## Focus
 
-Pinned: companion (sprite, name, rarity, XP bar, flavor) → ACTIVE ISSUE id + title → large remaining/OT clock → Pause + Open issue. Usage glance (today total + provider split); tap opens the Usage tab. No Focus pin button. Pet-off prompts (0:00, check-in, forfeit warning) appear **on Focus** when the overlay is not visible.
+Pinned: companion (120pt sprite, no grey box, name, rarity, XP bar, flavor) → ACTIVE ISSUE id + title → large remaining/OT clock → Pause + Open issue. Usage glance (today total + provider split); tap opens the Usage tab. No Focus pin button. Pet-off prompts (0:00, check-in, forfeit warning) appear **on Focus** when the overlay is not visible.
 
-Idle: same companion; copy “Select a Linear issue to focus”; **Open Linear** (switch tab) + **Open Today**. No in-progress list. Usage glance.
+Idle: same companion; copy “Select a Linear issue to focus”; **Start pomodoro** + **Open Linear** (switch tab) + **Open Today**. No in-progress list. Usage glance.
+
+**Pomodoro.** Overlay chevron and Focus/Today idle can start a timer with no Linear issue (`FocusPinnedIssue.pomodoroID`). Same clock / XP / pause path; hide Linear ID, status, notes, Mark done. Pinning a Linear issue while a pomodoro is running uses the forfeit path.
 
 ## Linear
 
@@ -57,6 +65,10 @@ Today totals, provider split, official limits (stale / auth-expired / tap-to-loa
 ## Collection
 
 Inner **Bag | Dex | Shop**. **Default Dex**. Settings representative pick still deep-links to Dex. Bag candy still jumps to Focus after use. Shop wallet stays here.
+
+## Overlay timer
+
+The floating pet always shows a 32pt circular chevron button (not a tiny glyph). With a session it folds/expands the island. With no session it starts a pomodoro and expands. Clicks left of the sprite go to SwiftUI so the button is hittable.
 
 ## Localization
 

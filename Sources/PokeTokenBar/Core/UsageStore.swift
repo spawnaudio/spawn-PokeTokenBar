@@ -160,6 +160,11 @@ final class UsageStore {
     var floatingPetIslandFolded: Bool {
         didSet { defaults.set(floatingPetIslandFolded, forKey: "floatingPetIslandFolded") }
     }
+    /// Menu-bar panel detached from the status item. Default attached (not draggable).
+    /// Only the in-panel button detaches or snaps it back — dragging does not.
+    var menuBarPanelDetached: Bool {
+        didSet { defaults.set(menuBarPanelDetached, forKey: MenuBarPanelMetrics.detachedKey) }
+    }
     /// Today desk left sidebar preferred width (pt). Independent of window frame autosave.
     var todayDeskLeftWidth: Double {
         didSet { defaults.set(todayDeskLeftWidth, forKey: TodayDeskLayout.leftWidthKey) }
@@ -644,6 +649,7 @@ final class UsageStore {
         floatingPetSize = d.object(forKey: "floatingPetSize") as? Double ?? 96
         floatingPetBubbleAlerts = d.object(forKey: "floatingPetBubbleAlerts") as? Bool ?? true
         floatingPetIslandFolded = d.object(forKey: "floatingPetIslandFolded") as? Bool ?? false
+        menuBarPanelDetached = d.object(forKey: MenuBarPanelMetrics.detachedKey) as? Bool ?? false
         let desk = TodayDeskLayout.load(from: d)
         todayDeskLeftWidth = Double(desk.leftWidth)
         todayDeskRightWidth = Double(desk.rightWidth)

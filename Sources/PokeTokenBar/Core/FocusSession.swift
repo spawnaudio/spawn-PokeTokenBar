@@ -140,6 +140,43 @@ struct FocusPinnedIssue: Codable, Equatable, Identifiable {
         teamStates = issue.teamStates
     }
 
+    /// Timer with no Linear issue. Same clock / XP path; Linear chrome is hidden.
+    static let pomodoroID = "focus.pomodoro"
+
+    static func pomodoro(title: String) -> FocusPinnedIssue {
+        FocusPinnedIssue(
+            id: pomodoroID,
+            identifier: "POMO",
+            title: title,
+            url: nil,
+            stateId: nil,
+            stateName: nil,
+            completedStateId: nil,
+            teamStates: [])
+    }
+
+    var isPomodoro: Bool { id == Self.pomodoroID }
+
+    private init(
+        id: String,
+        identifier: String,
+        title: String,
+        url: URL?,
+        stateId: String?,
+        stateName: String?,
+        completedStateId: String?,
+        teamStates: [LinearWorkflowState]
+    ) {
+        self.id = id
+        self.identifier = identifier
+        self.title = title
+        self.url = url
+        self.stateId = stateId
+        self.stateName = stateName
+        self.completedStateId = completedStateId
+        self.teamStates = teamStates
+    }
+
     var summary: LinearIssueSummary {
         LinearIssueSummary(
             id: id,

@@ -182,8 +182,9 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
     static func panelSize(petSize: CGFloat, showingBubble: Bool,
                           hasIsland: Bool, prompt: FocusPrompt, composingNote: Bool = false,
                           confirm: OverlayConfirmPrompt = .none,
-                          islandFolded: Bool = false) -> NSSize {
-        if !hasIsland, prompt == .none, confirm == .none {
+                          islandFolded: Bool = false,
+                          showsTimerToggle: Bool = false) -> NSSize {
+        if !hasIsland, !showsTimerToggle, prompt == .none, confirm == .none {
             if showingBubble {
                 return NSSize(width: max(petSize, bubbleMinWidth),
                               height: petSize + bubbleHeadroom)
@@ -202,7 +203,8 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
             }
         }
         let composerH = (hasIsland && composingNote) ? noteComposerHeight : 0
-        let chevronW: CGFloat = hasIsland ? islandFoldChevronSize + islandGap : 0
+        let showsToggle = hasIsland || showsTimerToggle
+        let chevronW: CGFloat = showsToggle ? islandFoldChevronSize + islandGap : 0
         let foldedClockW: CGFloat = (hasIsland && islandFolded) ? islandFoldedClockWidth + islandGap : 0
         let showChrome = hasIsland && !islandFolded
         let needsPromptColumn = promptH > 0 || composerH > 0
@@ -313,7 +315,7 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
             hosting.canCreateIssue = { [weak self] in self?.store.canComposeLinearIssue ?? false }
             hosting.languageProvider = { [weak self] in self?.companion.language ?? .systemDefault }
             hosting.petSize = CGFloat(store.floatingPetSize)
-            hosting.hasIsland = session.isActive
+            hosting.hasIsland = true
             hosting.onHoverChange = { [weak self] hovering in
                 if hovering { self?.showHoverCallout() } else { self?.hideHoverCallout() }
             }
@@ -323,7 +325,7 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
         if let hosting = p.contentView as? PetHostingView {
             hosting.toolTip = currentHoverText()
             hosting.petSize = CGFloat(store.floatingPetSize)
-            hosting.hasIsland = session.isActive
+            hosting.hasIsland = true
             hosting.onOpenToday = onOpenToday
             hosting.onNewIssue = onNewIssue
             hosting.canCreateIssue = { [weak self] in self?.store.canComposeLinearIssue ?? false }
@@ -426,13 +428,17 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
         return .none
     }
 
+    private func overlayPanelSize(petSize: CGFloat, showingBubble: Bool) -> NSSize {
+        Self.panelSize(petSize: petSize, showingBubble: showingBubble,
+                       hasIsland: session.isActive, prompt: session.prompt,
+                       composingNote: session.isComposingNote,
+                       confirm: overlayConfirm,
+                       islandFolded: store.floatingPetIslandFolded,
+                       showsTimerToggle: true)
+    }
+
     private func targetFrame(petSize: CGFloat, showingBubble: Bool) -> NSRect {
-        let hasIsland = session.isActive
-        let size = Self.panelSize(petSize: petSize, showingBubble: showingBubble,
-                                  hasIsland: hasIsland, prompt: session.prompt,
-                                  composingNote: session.isComposingNote,
-                                  confirm: overlayConfirm,
-                                  islandFolded: store.floatingPetIslandFolded)
+        let size = overlayPanelSize(petSize: petSize, showingBubble: showingBubble)
         let petOrigin: NSPoint
         if let x = defaults.object(forKey: Self.originXKey) as? Double,
            let y = defaults.object(forKey: Self.originYKey) as? Double {
@@ -441,12 +447,12 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
             petOrigin = Self.defaultPetOrigin(petSize: petSize)
         }
         var frame = NSRect(origin: Self.panelOrigin(petOrigin: petOrigin, petSize: petSize,
-                                                    panelSize: size, hasIsland: hasIsland),
+                                                    panelSize: size, hasIsland: true),
                            size: size)
         if !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
             let fallbackPet = Self.defaultPetOrigin(petSize: petSize)
             frame.origin = Self.panelOrigin(petOrigin: fallbackPet, petSize: petSize,
-                                            panelSize: size, hasIsland: hasIsland)
+                                            panelSize: size, hasIsland: true)
         }
         return frame
     }
@@ -478,14 +484,9 @@ final class FloatingPetController: NSObject, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) {
         guard let p = panel, p.isVisible else { return }
         let petSize = CGFloat(store.floatingPetSize)
-        let hasIsland = session.isActive
-        let size = Self.panelSize(petSize: petSize, showingBubble: store.currentSpeechBubble != nil,
-                                  hasIsland: hasIsland, prompt: session.prompt,
-                                  composingNote: session.isComposingNote,
-                                  confirm: overlayConfirm,
-                                  islandFolded: store.floatingPetIslandFolded)
+        let size = overlayPanelSize(petSize: petSize, showingBubble: store.currentSpeechBubble != nil)
         let pet = Self.petOrigin(panelOrigin: p.frame.origin, petSize: petSize,
-                                 panelSize: size, hasIsland: hasIsland)
+                                 panelSize: size, hasIsland: true)
         defaults.set(Double(pet.x), forKey: Self.originXKey)
         defaults.set(Double(pet.y), forKey: Self.originYKey)
         if hoverPanel?.isVisible == true { showHoverCallout() }
@@ -644,14 +645,15 @@ struct FloatingPetView: View {
                     if store.floatingPetIslandFolded {
                         foldedMiniClock
                     }
-                    islandFoldChevron
                 }
+                islandFoldChevron
                 SpriteView(speciesID: subject.speciesID, size: size, animated: animated,
                            shiny: subject.isShiny,
                            minFrameDelay: store.animationQuality.frameFloor)
                     .frame(width: size, height: size)
                     .zIndex(0)
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .animation(animated ? .spring(response: 0.3, dampingFraction: 0.7) : nil,
@@ -704,24 +706,34 @@ struct FloatingPetView: View {
 
     private var islandFoldChevron: some View {
         let l = companion.l
+        let folded = store.floatingPetIslandFolded || !session.isActive
         return Button {
-            store.floatingPetIslandFolded.toggle()
+            if session.isActive {
+                store.floatingPetIslandFolded.toggle()
+            } else {
+                session.startPomodoro()
+                store.floatingPetIslandFolded = false
+            }
         } label: {
-            Image(systemName: store.floatingPetIslandFolded ? "chevron.left" : "chevron.right")
-                .font(.system(size: 9, weight: .semibold))
+            Image(systemName: folded ? "chevron.left" : "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(
                     width: FloatingPetController.islandFoldChevronSize,
                     height: FloatingPetController.islandFoldChevronSize)
-                .contentShape(Rectangle())
+                .background(Color.primary.opacity(0.08), in: Circle())
+                .overlay {
+                    Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+                }
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .frame(
             width: FloatingPetController.islandFoldChevronSize,
             height: FloatingPetController.islandFoldChevronSize)
         .contentShape(Rectangle())
-        .help(store.floatingPetIslandFolded ? l.expandTimer : l.collapseTimer)
-        .accessibilityLabel(store.floatingPetIslandFolded ? l.expandTimer : l.collapseTimer)
+        .help(folded ? l.expandTimer : l.collapseTimer)
+        .accessibilityLabel(folded ? l.expandTimer : l.collapseTimer)
     }
 
     static func hoverTooltip(todayTokens: Int, limitUtilization: Double?,

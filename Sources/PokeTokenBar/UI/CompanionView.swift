@@ -451,6 +451,7 @@ struct EvoLineView: View {
 @MainActor
 struct CompanionHeader: View {
     let store: CompanionStore
+    static let spriteSize: CGFloat = 120
     @Environment(\.popoverContentWidth) private var popoverContentWidth
     // 연출 상태 — 부화/진화 순간 흰 플래시 + 스프링 스케일(본가 진화 신 오마주)
     @State private var flashOpacity: Double = 0
@@ -473,11 +474,9 @@ struct CompanionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 12) {
-                SpriteView(speciesID: store.currentSpeciesID, size: 76, bob: true, animated: true,
+                SpriteView(speciesID: store.currentSpeciesID, size: CompanionHeader.spriteSize, bob: true, animated: true,
                            shiny: store.currentIsShiny)
-                    .frame(width: 76, height: 76)
-                    .background(Color.secondary.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(width: CompanionHeader.spriteSize, height: CompanionHeader.spriteSize)
                     .rotationEffect(.degrees(eggImminent && eggWiggle ? 5 : (eggImminent ? -5 : 0)))
                     .scaleEffect(celebScale)
                     .overlay(RoundedRectangle(cornerRadius: 12).fill(.white).opacity(flashOpacity))
@@ -500,7 +499,10 @@ struct CompanionHeader: View {
                             Text("+\(TokenFormatter.compact(candyXPAmount)) XP")
                                 .font(.caption.weight(.bold)).foregroundStyle(.orange)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(.regularMaterial, in: Capsule())
+                                .background(Color.primary.opacity(0.10), in: Capsule())
+                                .overlay {
+                                    Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+                                }
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                                 .offset(y: -16)
                         }
