@@ -651,20 +651,18 @@ struct ProviderTabBar: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            TahoeGlassCluster(spacing: 6) {
-                HStack(spacing: 6) {
-                    ForEach(snapshots) { snap in
-                        let isSelected = snap.providerID == selectedID
-                        Button { onSelect(snap.providerID) } label: {
-                            Text(snap.displayName)
-                                .lineLimit(1)
-                                .fixedSize(horizontal: true, vertical: false)
-                                .font(.caption.weight(isSelected ? .semibold : .regular))
-                        }
-                        .controlSize(.small)
-                        .tahoeButtonStyle(isSelected ? .prominent : .regular)
-                        .buttonBorderShape(.capsule)
+            HStack(spacing: 4) {
+                ForEach(snapshots) { snap in
+                    let isSelected = snap.providerID == selectedID
+                    Button { onSelect(snap.providerID) } label: {
+                        Text(snap.displayName)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .font(.caption.weight(isSelected ? .semibold : .regular))
+                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
                     }
+                    .controlSize(.small)
+                    .linearSegmentChrome(selected: isSelected)
                 }
             }
         }

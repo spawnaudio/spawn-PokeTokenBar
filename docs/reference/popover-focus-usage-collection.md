@@ -17,7 +17,7 @@ This file lives under `docs/reference/` because the repo publishes only that doc
 
 Sticky **NSWindow** (not a transient `NSPopover`). Click-outside and focus loss do **not** close it. Status-item click toggles; the close button and pet/open paths bring it forward if already shown. Hosting is still torn down on close (energy).
 
-Default size **360×640**. Resizable: min **360×520**, max **720×660** (Today is 920×680). Frame autosave `PokeTokenBarMenuBarPanel`. System light/dark. `NSVisualEffectView` material `.popover`. Cards: ~12pt continuous corners and a hairline. Lists stay **opaque** — Tahoe glass (`#available(macOS 26, *)`) is only on the **bottom bar** and the Focus **Pause** button (`.glassProminent` / `.borderedProminent`). SF Pro. Caption2 tertiary section labels. Clock: large rounded `monospacedDigit`.
+Default size **360×640**. Resizable: min **360×520**, max **720×660** (Today is 920×680). Frame autosave `PokeTokenBarMenuBarPanel`. System light/dark. `NSVisualEffectView` material `.popover`. Cards: ~12pt continuous corners and a hairline. Lists stay **opaque and unboxed** — rows use hairline dividers and a hover fill, not a card per item. Tahoe glass (`#available(macOS 26, *)`) is only on the **bottom bar**, Focus **Pause**, and **Mark done**. Sub-tabs are quiet selected pills (`TahoeTabBar` / `linearSegmentChrome`). Dropdowns are quiet bordered chips (`TahoePopupMenu` / `linearChipChrome`), not glass. Issue IDs are muted text, not pills. SF Pro. Caption2 tertiary section labels. Clock: large rounded `monospacedDigit`.
 
 Compact layout tests still use `PopoverMetrics.width` (360). Live width is `\.popoverContentWidth`.
 
@@ -42,7 +42,7 @@ Keep nested tabs — do not flatten:
 - Projects: In progress · Production
 - Initiatives: Active · Planned
 
-Header: New issue + refresh (calendar is the trailing Today icon). Dense rows from already-fetched `LinearIssueSummary`: status dot+name, ID pill, title, priority, teamKey, projectName, assigneeName, truncated labels, estimate, dueDate, one muted description line. Hide empty fields. Completion XP when present. Project/initiative headers: lead/owner, targetDate, status, issue count.
+Header: New issue + refresh (calendar is the trailing Today icon). Unboxed two-line rows from already-fetched `LinearIssueSummary`: status dot, bright title, muted ID, metadata chips (`LinearTagChip`), truncated description, trailing status chip + pin. Hide empty fields. Completion XP when present. Project/initiative group headers are a full-width quiet strip (chevron, name, lead/owner, targetDate, status, count) — not extra cards.
 
 **Pin** starts the session and **switches to the Focus tab**. Do **not** auto-open Today from this pin. Today still opens from the calendar icon, the idle CTA, and the pet menu. Pinning from the Today desk is unchanged (`openDesk` as today).
 

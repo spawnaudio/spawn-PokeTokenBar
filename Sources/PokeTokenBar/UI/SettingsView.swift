@@ -192,7 +192,7 @@ struct SettingsView: View {
                     TahoeMenuLabel(text: representativeSelectionText)
                 }
                 .menuIndicator(.hidden)
-                .tahoeButtonStyle(.regular)
+                .linearChipChrome()
                 .controlSize(.small)
                 .frame(width: 150, alignment: .trailing)
                 .layoutPriority(1)

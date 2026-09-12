@@ -62,6 +62,28 @@ extension View {
         modifier(PopoverCardModifier())
     }
 
+    /// Quiet bordered pill for menus/dropdowns (Linear chip, not glass).
+    func linearChipChrome(expands: Bool = false) -> some View {
+        self
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(maxWidth: expands ? .infinity : nil, alignment: .leading)
+            .background(Color.primary.opacity(0.05), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+            }
+    }
+
+    /// Quiet segmented item: selected is a filled pill, idle has no chrome.
+    func linearSegmentChrome(selected: Bool) -> some View {
+        self
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(selected ? Color.primary.opacity(0.12) : Color.clear, in: Capsule())
+    }
+
     /// Tahoe glass on the bottom tab strip only. Older macOS keeps an ultra-thin material bar.
     @ViewBuilder
     func popoverBottomBarChrome() -> some View {
@@ -117,11 +139,11 @@ extension View {
 }
 
 enum TahoeChromeSymbol {
-    /// Trailing menu affordance on Tahoe popup buttons.
+    /// Trailing menu affordance on popup chips.
     static let menuChevron = "chevron.down"
 }
 
-/// Glass popup label: current value plus a trailing chevron, matching Tahoe buttons.
+/// Quiet popup label: current value plus a trailing chevron (Linear chip, not glass).
 @MainActor
 struct TahoeMenuLabel: View {
     let text: String
@@ -141,7 +163,7 @@ struct TahoeMenuLabel: View {
     }
 }
 
-/// Menu-styled picker that renders as a Tahoe glass button with a chevron.
+/// Menu-styled picker as a quiet bordered chip with a chevron.
 @MainActor
 struct TahoePopupMenu<Selection: Hashable, Content: View>: View {
     let accessibilityLabel: String
@@ -162,9 +184,8 @@ struct TahoePopupMenu<Selection: Hashable, Content: View>: View {
             TahoeMenuLabel(text: selectionTitle, expands: expands)
         }
         .menuIndicator(.hidden)
-        .tahoeButtonStyle(.regular)
+        .linearChipChrome(expands: expands)
         .controlSize(size)
-        .frame(maxWidth: expands ? .infinity : nil, alignment: .leading)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(selectionTitle)
     }
@@ -182,7 +203,7 @@ struct TahoeTabItem<Value: Hashable> {
     }
 }
 
-/// Selected = prominent glass, idle = regular glass. Replaces segmented pickers.
+/// Selected = filled quiet pill, idle = no fill. Not Tahoe glass.
 @MainActor
 struct TahoeTabBar<Value: Hashable>: View {
     @Binding var selection: Value
@@ -190,27 +211,64 @@ struct TahoeTabBar<Value: Hashable>: View {
     let items: [TahoeTabItem<Value>]
 
     var body: some View {
-        TahoeGlassCluster(spacing: 6) {
-            HStack(spacing: 6) {
-                ForEach(items, id: \.value) { item in
-                    let selected = selection == item.value
-                    Button {
-                        selection = item.value
-                    } label: {
-                        if let symbol = item.symbol {
-                            Label(item.title, systemImage: symbol)
-                        } else {
-                            Text(item.title)
-                        }
+        HStack(spacing: 4) {
+            ForEach(items, id: \.value) { item in
+                let selected = selection == item.value
+                Button {
+                    selection = item.value
+                } label: {
+                    if let symbol = item.symbol {
+                        Label(item.title, systemImage: symbol)
+                    } else {
+                        Text(item.title)
                     }
-                    .tahoeButtonStyle(selected ? .prominent : .regular)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(size)
-                    .accessibilityLabel(item.title)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
+                .font(.caption.weight(selected ? .semibold : .regular))
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .linearSegmentChrome(selected: selected)
+                .controlSize(size)
+                .accessibilityLabel(item.title)
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
+    }
+}
+
+/// 24–28pt metadata pill: quiet border, no glass.
+@MainActor
+struct LinearTagChip: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .overlay {
+                Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+            }
+    }
+}
+
+/// Muted label, brighter value — inspector / composer property rows.
+@MainActor
+struct LinearPropertyRow<Value: View>: View {
+    let label: String
+    @ViewBuilder var value: Value
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 72, alignment: .leading)
+            value
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 3)
     }
 }
 

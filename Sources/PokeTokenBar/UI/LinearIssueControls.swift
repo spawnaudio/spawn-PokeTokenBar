@@ -91,7 +91,7 @@ struct LinearStatusDot: View {
 struct LinearIssueIDButton: View {
     let identifier: String
     var url: URL?
-    var style: Font = .caption.weight(.semibold)
+    var style: Font = .caption2
 
     /// Help uses the companion language; English fallback is never shown as a Hangul literal.
     @Environment(CompanionStore.self) private var companion
@@ -102,9 +102,9 @@ struct LinearIssueIDButton: View {
         } label: {
             Text(identifier)
                 .font(style)
+                .foregroundStyle(.secondary)
         }
-        .tahoeButtonStyle(.regular)
-        .controlSize(.mini)
+        .buttonStyle(.plain)
         .disabled(url == nil)
         .help(companion.l.linearOpenIssue)
     }
@@ -234,10 +234,10 @@ struct LinearFocusButton: View {
             onPinned?()
         } label: {
             Text(isPinned ? l.focusingNow : l.focusAction)
+                .foregroundStyle(isPinned ? Color.accentColor : Color.secondary)
         }
-        .tahoeButtonStyle(.regular)
+        .linearChipChrome()
         .controlSize(compact ? .mini : .small)
-        .tint(isPinned ? .accentColor : .secondary)
     }
 }
 
@@ -262,12 +262,26 @@ struct NewLinearIssueButton: View {
                 Image(systemName: "plus")
             }
         }
-        .tahoeButtonStyle(showsTitle ? .regular : .accessory)
-        .buttonBorderShape(showsTitle ? .capsule : .circle)
+        .modifier(NewLinearIssueChrome(showsTitle: showsTitle))
         .controlSize(compact ? .mini : .small)
         .disabled(!store.canComposeLinearIssue)
         .help(store.canComposeLinearIssue ? l.newLinearIssue : l.linearIssuesNeedsSetup)
         .accessibilityLabel(l.newLinearIssue)
+    }
+}
+
+@MainActor
+private struct NewLinearIssueChrome: ViewModifier {
+    let showsTitle: Bool
+
+    func body(content: Content) -> some View {
+        if showsTitle {
+            content.linearChipChrome()
+        } else {
+            content
+                .tahoeButtonStyle(.accessory)
+                .buttonBorderShape(.circle)
+        }
     }
 }
 
@@ -351,6 +365,7 @@ struct FocusTimerControls: View {
         HStack(spacing: compact ? 4 : 8) {
             Button(l.resetTimer) { session.requestReset() }
                 .disabled(!session.canResetClock)
+                .tahoeButtonStyle(.regular)
             Menu {
                 ForEach(presets, id: \.self) { minutes in
                     Button(l.addTimeMinutes(minutes)) {
@@ -361,11 +376,12 @@ struct FocusTimerControls: View {
                 TahoeMenuLabel(text: l.addTime)
             }
             .menuIndicator(.hidden)
+            .linearChipChrome()
             .disabled(!session.canAddRemainingTime)
             Button(l.unfocusAction) { session.requestUnfocus() }
                 .foregroundStyle(.red)
+                .tahoeButtonStyle(.regular)
         }
-        .tahoeButtonStyle(.regular)
         .controlSize(compact ? .mini : .small)
     }
 }

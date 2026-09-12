@@ -127,7 +127,7 @@ struct LinearIssueComposerView: View {
                             .stroke(Color.secondary.opacity(0.3))
                     )
             }
-            labeled(l.linearIssueTeam) {
+            LinearPropertyRow(label: l.linearIssueTeam) {
                 TahoePopupMenu(
                     accessibilityLabel: l.linearIssueTeam,
                     selectionTitle: catalog?.teams.first { $0.id == teamID }.map(teamKeyLabel) ?? l.linearIssueTeam,
@@ -141,7 +141,7 @@ struct LinearIssueComposerView: View {
                 }
                 .onChange(of: teamID) { _, _ in applyTeamDefaults() }
             }
-            labeled(l.linearIssueProject) {
+            LinearPropertyRow(label: l.linearIssueProject) {
                 TahoePopupMenu(
                     accessibilityLabel: l.linearIssueProject,
                     selectionTitle: teamProjects.first { $0.id == projectID }?.name ?? l.linearIssueNoProject,
@@ -155,7 +155,7 @@ struct LinearIssueComposerView: View {
                     }
                 }
             }
-            labeled(l.linearIssueAssignee) {
+            LinearPropertyRow(label: l.linearIssueAssignee) {
                 TahoePopupMenu(
                     accessibilityLabel: l.linearIssueAssignee,
                     selectionTitle: catalog?.users.first { $0.id == assigneeID }.map(assigneeLabel)
@@ -170,7 +170,7 @@ struct LinearIssueComposerView: View {
                     }
                 }
             }
-            labeled(l.linearIssueStatus) {
+            LinearPropertyRow(label: l.linearIssueStatus) {
                 TahoePopupMenu(
                     accessibilityLabel: l.linearIssueStatus,
                     selectionTitle: selectedTeam?.states.first { $0.id == stateID }?.name ?? l.linearIssueStatus,
@@ -183,7 +183,7 @@ struct LinearIssueComposerView: View {
                     }
                 }
             }
-            labeled(l.linearIssueLabels) {
+            LinearPropertyRow(label: l.linearIssueLabels) {
                 LinearIssueLabelsMenu(
                     labels: teamLabels,
                     selectedIDs: $selectedLabelIDs,
@@ -343,8 +343,7 @@ struct LinearIssueLabelsMenu: View {
             TahoeMenuLabel(text: title, expands: true)
         }
         .menuIndicator(.hidden)
-        .tahoeButtonStyle(.regular)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .linearChipChrome(expands: true)
         .disabled(labels.isEmpty)
         .accessibilityLabel(l.linearIssueLabels)
         .accessibilityValue(title)
