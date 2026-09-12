@@ -415,6 +415,26 @@ struct L {
     var todayDeskLabelsLabel: String { t("레이블", "Labels", "ラベル", "Etiquetas", "Libellés", "Rótulos", "Labels") }
     var todayDeskEstimateLabel: String { t("추정", "Estimate", "見積", "Estimación", "Estimation", "Estimativa", "Schätzung") }
     var todayDeskDueLabel: String { t("기한", "Due", "期限", "Vencimiento", "Échéance", "Prazo", "Fällig") }
+    var collapseLeftSidebar: String {
+        t("왼쪽 사이드바 접기", "Collapse left sidebar", "左サイドバーを折りたたむ",
+          "Contraer barra lateral izquierda", "Replier la barre latérale gauche",
+          "Recolher a barra lateral esquerda", "Linke Seitenleiste einklappen")
+    }
+    var expandLeftSidebar: String {
+        t("왼쪽 사이드바 펼치기", "Expand left sidebar", "左サイドバーを展開",
+          "Expandir barra lateral izquierda", "Déplier la barre latérale gauche",
+          "Expandir a barra lateral esquerda", "Linke Seitenleiste ausklappen")
+    }
+    var collapseRightSidebar: String {
+        t("오른쪽 사이드바 접기", "Collapse right sidebar", "右サイドバーを折りたたむ",
+          "Contraer barra lateral derecha", "Replier la barre latérale droite",
+          "Recolher a barra lateral direita", "Rechte Seitenleiste einklappen")
+    }
+    var expandRightSidebar: String {
+        t("오른쪽 사이드바 펼치기", "Expand right sidebar", "右サイドバーを展開",
+          "Expandir barra lateral derecha", "Déplier la barre latérale droite",
+          "Expandir a barra lateral direita", "Rechte Seitenleiste ausklappen")
+    }
     var focusAction: String { t("집중", "Focus", "集中", "Enfoque", "Focus", "Foco", "Fokus") }
     var focusingNow: String { t("집중 중", "Focusing", "集中中", "Enfocando", "En cours", "Focado", "Aktiv") }
     var pauseTimer: String { t("일시정지", "Pause", "一時停止", "Pausa", "Pause", "Pausar", "Pause") }

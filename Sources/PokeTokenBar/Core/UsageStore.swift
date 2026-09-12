@@ -153,6 +153,36 @@ final class UsageStore {
     var floatingPetIslandFolded: Bool {
         didSet { defaults.set(floatingPetIslandFolded, forKey: "floatingPetIslandFolded") }
     }
+    /// Today desk left sidebar preferred width (pt). Independent of window frame autosave.
+    var todayDeskLeftWidth: Double {
+        didSet { defaults.set(todayDeskLeftWidth, forKey: TodayDeskLayout.leftWidthKey) }
+    }
+    /// Today desk right sidebar preferred width (pt). Independent of window frame autosave.
+    var todayDeskRightWidth: Double {
+        didSet { defaults.set(todayDeskRightWidth, forKey: TodayDeskLayout.rightWidthKey) }
+    }
+    var todayDeskLeftCollapsed: Bool {
+        didSet { defaults.set(todayDeskLeftCollapsed, forKey: TodayDeskLayout.leftCollapsedKey) }
+    }
+    var todayDeskRightCollapsed: Bool {
+        didSet { defaults.set(todayDeskRightCollapsed, forKey: TodayDeskLayout.rightCollapsedKey) }
+    }
+    /// Preferred Today sidebar layout. Display clamp lives on `TodayDeskLayout.resolved`.
+    var todayDeskLayout: TodayDeskLayout {
+        get {
+            TodayDeskLayout(
+                leftWidth: CGFloat(todayDeskLeftWidth),
+                rightWidth: CGFloat(todayDeskRightWidth),
+                leftCollapsed: todayDeskLeftCollapsed,
+                rightCollapsed: todayDeskRightCollapsed)
+        }
+        set {
+            todayDeskLeftWidth = Double(newValue.leftWidth)
+            todayDeskRightWidth = Double(newValue.rightWidth)
+            todayDeskLeftCollapsed = newValue.leftCollapsed
+            todayDeskRightCollapsed = newValue.rightCollapsed
+        }
+    }
     var disableKeychainAccess: Bool {
         didSet {
             defaults.set(disableKeychainAccess, forKey: "disableKeychainAccess")   // 저장 누락이던 기존 버그 — 재시작 후 풀렸음
@@ -559,6 +589,11 @@ final class UsageStore {
         floatingPetSize = d.object(forKey: "floatingPetSize") as? Double ?? 96
         floatingPetBubbleAlerts = d.object(forKey: "floatingPetBubbleAlerts") as? Bool ?? true
         floatingPetIslandFolded = d.object(forKey: "floatingPetIslandFolded") as? Bool ?? false
+        let desk = TodayDeskLayout.load(from: d)
+        todayDeskLeftWidth = Double(desk.leftWidth)
+        todayDeskRightWidth = Double(desk.rightWidth)
+        todayDeskLeftCollapsed = desk.leftCollapsed
+        todayDeskRightCollapsed = desk.rightCollapsed
         // 기본 powerSaver — 이 설정이 생기기 전의 고정 캡(0.4s)과 같은 프레임 레이트라, 기존
         // 사용자의 배터리 프로파일은 그대로다. 더 부드러운 쪽은 opt-in(실측 idle CPU 1.8%/5.1%).
         animationQuality = AnimationQuality(rawValue: d.string(forKey: "animationQuality") ?? "") ?? .powerSaver

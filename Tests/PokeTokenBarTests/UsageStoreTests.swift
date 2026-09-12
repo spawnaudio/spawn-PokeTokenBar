@@ -281,6 +281,27 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertTrue(reloaded.floatingPetIslandFolded)
     }
 
+    func testTodayDeskSidebarLayoutDefaultAndPersistence() {
+        let claude = FakeUsageProvider(id: "claude_code", displayName: "Claude Code", daily: todayDaily(1_000))
+        let store = makeStore(providers: [claude])
+        XCTAssertEqual(store.todayDeskLeftWidth, Double(TodayDeskMetrics.leftSidebarWidth))
+        XCTAssertEqual(store.todayDeskRightWidth, Double(TodayDeskMetrics.rightSidebarWidth))
+        XCTAssertFalse(store.todayDeskLeftCollapsed)
+        XCTAssertFalse(store.todayDeskRightCollapsed)
+
+        store.todayDeskLayout = TodayDeskLayout(
+            leftWidth: 280,
+            rightWidth: 176,
+            leftCollapsed: true,
+            rightCollapsed: false)
+
+        let reloaded = makeStore(providers: [claude])
+        XCTAssertEqual(reloaded.todayDeskLeftWidth, 280)
+        XCTAssertEqual(reloaded.todayDeskRightWidth, 176)
+        XCTAssertTrue(reloaded.todayDeskLeftCollapsed)
+        XCTAssertFalse(reloaded.todayDeskRightCollapsed)
+    }
+
     /// Bubble picker is pure: critical beats warn; within a tier higher utilization wins (stable choice).
     func testBubbleAlertPicksHighestSeverityThenUtilization() {
         let warnLow = UsageStore.LimitAlert(key: "a", window: "A", isCritical: false, utilization: 81)
