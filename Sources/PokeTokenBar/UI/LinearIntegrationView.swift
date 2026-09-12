@@ -162,7 +162,7 @@ struct LinearIntegrationView: View {
                 }
             }
         }
-        .frame(height: 520)
+        .frame(maxWidth: .infinity, minHeight: 520, maxHeight: .infinity, alignment: .top)
         .task(id: store.linearIntegrationEnabled && store.linearAPIKeyConfigured) {
             guard store.linearIntegrationEnabled, store.linearAPIKeyConfigured else { return }
             _ = await store.refreshLinearIssues()

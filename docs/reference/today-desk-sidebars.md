@@ -14,7 +14,7 @@ Locked with the popover IA (2026-09-12). Today is still a titled `NSWindow`, not
 
 Identifier **`PokeTokenBar.TodayDesk`** (LaunchWindowPolicy unchanged). Autosave `PokeTokenBarTodayDesk` stores the **window frame only**. Sidebar widths and collapse flags are separate UserDefaults keys (see Resize / collapse). Style: titled, closable, miniaturizable, resizable. Default **920×680**, minimum width fits three columns (~860pt): left 212 + center ≥360 + right 232 + splitter strips + padding. Closing Today does **not** stop the session. Collapsing a sidebar gives that space to the center; the window min size stays the three-column width so frame autosave cannot shrink below the clock.
 
-Chrome matches the popover: system light/dark, `NSVisualEffectView` / `.ultraThinMaterial`, ~12pt continuous hairline cards, SF Pro, caption2 tertiary labels, large rounded monospaced clock, Linear ID pills + status dots. Tahoe glass (`#available(macOS 26)`) only on **Pause** and **Mark done**. Lists stay opaque.
+Chrome matches the menu-bar panel: system light/dark, `NSVisualEffectView` / `.ultraThinMaterial`, ~12pt continuous hairline cards, SF Pro, caption2 tertiary labels, large rounded monospaced clock, Linear ID pills + status dots. Tahoe glass (`#available(macOS 26)`) only on **Pause** and **Mark done**. Lists stay opaque. The menu-bar panel is a smaller sticky window (360–720pt), not a fifth popover tab and not this desk.
 
 No Quit. Trailing refresh lives in the left header.
 

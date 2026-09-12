@@ -28,10 +28,9 @@ enum LaunchWindowPolicy {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private let popover = NSPopover()
-    private var outsideClickMonitor = OutsideClickMonitor()
+    private var menuBarPanel: MenuBarPanelController!
     private var store: UsageStore!
     private var companion: CompanionStore!
     private var sessionStore: FocusSessionStore!
@@ -117,6 +116,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updater = UpdateChecker()
         store.localizationLanguage = companion.language   // 알림 현지화용 미러 시드
         store.onRefresh = { [weak self] in self?.onStoreRefreshed() }   // 한도 로드 후 companion·사탕 지급
+        menuBarPanel = MenuBarPanelController(
+            usage: store,
+            companion: companion,
+            session: sessionStore,
+            updater: updater,
+            navigation: navigation)
+        menuBarPanel.onVisibilityChange = { [weak self] in self?.syncMenuAnimation() }
         floatingPet = FloatingPetController(
             store: store, companion: companion, session: sessionStore,
             onOpenPopover: { [weak self] in self?.openPopover() },
@@ -137,9 +143,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             let egg = Self.eggImage(up: false)
             setStatusImage(egg, cgFrame: Self.cgFrame(from: egg))   // 초기 알도 같은 경로로(불변식)
         }
-
-        popover.behavior = .transient
-        popover.delegate = self   // didShow: outside-click monitor; didClose: 호스팅 해제 + 모니터 제거
 
         observeStore()
         observeSession()
@@ -536,7 +539,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 팝오버 열림 중엔 정지 — 팝오버 SpriteView 가 이미 컴패니언을 움직여 중복이고, 트래킹 중 상태아이콘
         // 리드로우는 WindowServer 부하(다른 앱 비컨볼) 위험. (status-item 앱은 occlusion 이 실제로 잘 안 떠서
         // displayAwake 슬립 게이팅이 실질 방어 — occlusion 체크는 유지하되 보조적.)
-        displayAwake && !popover.isShown
+        displayAwake && !menuBarPanel.isShown
             && (statusItem.button?.window?.occlusionState.contains(.visible) ?? true)
     }
 
@@ -608,67 +611,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         return img
     }
 
-    /// 팝오버 콘텐츠(SwiftUI 호스팅) 생성. .transient 팝오버는 contentViewController 를 평생 보유해 닫혀도
-    /// NSHostingView 트리가 상주하며 매 디스플레이 사이클 재레이아웃된다(측정: idle CPU 최대 비용 — 닫힌
-    /// 팝오버의 relative-time Text self-invalidation × 메뉴 애니메이션 CA 커밋). 그래서 열 때 만들고 닫힐 때 해제.
+    /// Menu-bar panel hosting is created on show and released on close so a hidden
+    /// NSHostingView cannot idle-relayout (energy: relative-time Text self-invalidation).
     func openPopover() {
-        // Pet click is an outside click for a .transient popover — if already shown it is
-        // already dismissing; the old "activate/makeKey" branch never applied.
-        guard !popover.isShown else { return }
-        togglePopover()
-    }
-
-    private func buildPopoverContent() {
-        popover.contentViewController = NSHostingController(
-            rootView: PopoverView()
-                .environment(store).environment(companion).environment(updater)
-                .environment(navigation).environment(sessionStore))
+        menuBarPanel.present(from: statusItem.button, resetNavigation: !menuBarPanel.isShown)
+        if menuBarPanel.isShown {
+            store.requestNotificationAuthorizationIfNeeded()
+            Task { await updater.check() }
+        }
     }
 
     @objc private func togglePopover() {
         guard let button = statusItem.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)   // 해제·메뉴 애니메이션 재개는 popoverDidClose 에서
-        } else {
-            navigation.reset()   // reopen always lands on Focus (Settings must not linger)
-            buildPopoverContent()   // 열 때 호스팅 트리 생성(닫힐 때 해제)
-            // LSUIElement 앱이 비활성이면 팝오버 내부 버튼 클릭이 무시됨 — show 전에 활성화 보장
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
-            syncMenuAnimation()   // 팝오버 열림 → 메뉴바 애니메이션 정지(중복 + WindowServer 부하 회피)
-            store.requestNotificationAuthorizationIfNeeded()   // 알림 권한은 사용자가 앱을 처음 열 때 요청
-            Task { await updater.check() }   // 팝오버 열 때 재확인(내부 minInterval 디바운스)
+        let wasShown = menuBarPanel.isShown
+        menuBarPanel.toggle(from: button)
+        if menuBarPanel.isShown, !wasShown {
+            store.requestNotificationAuthorizationIfNeeded()
+            Task { await updater.check() }
         }
-    }
-
-    /// Start and stop are both delegate-driven so a second `show` path cannot
-    /// overwrite a live token (#168). `start` is also idempotent if `didShow` fires twice.
-    func popoverDidShow(_ notification: Notification) {
-        startOutsideClickMonitor()
-    }
-
-    /// 팝오버가 닫히면 호스팅 컨트롤러 해제(숨은 트리 재레이아웃 비용 제거) + 메뉴바 애니메이션 재개.
-    func popoverDidClose(_ notification: Notification) {
-        stopOutsideClickMonitor()
-        popover.contentViewController = nil
-        syncMenuAnimation()
-    }
-
-    /// 다른 메뉴바 팝업은 앱을 비활성화 안 시켜 .transient 가 못 닫는다 → 열림 동안만 앱 밖 클릭을 직접 감지해 닫는다(관찰 전용, 권한 불필요).
-    private func startOutsideClickMonitor() {
-        outsideClickMonitor.start {
-            NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-                Task { @MainActor in
-                    guard let self, self.popover.isShown else { return }
-                    self.popover.performClose(nil)
-                }
-            }
-        }
-    }
-
-    private func stopOutsideClickMonitor() {
-        outsideClickMonitor.stop { NSEvent.removeMonitor($0) }
     }
 
     // MARK: 디스플레이 / 메뉴바 가시성 (에너지 절약 — 안 보이면 애니메이션 정지)

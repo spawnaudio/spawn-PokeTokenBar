@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Popover material (`NSVisualEffectView.Material.popover`) so the 360pt panel
+/// Popover material (`NSVisualEffectView.Material.popover`) so the menu-bar panel
 /// follows system light/dark instead of an opaque window fill.
 @MainActor
 struct PopoverMaterialBackground: NSViewRepresentable {

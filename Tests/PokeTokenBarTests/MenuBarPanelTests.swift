@@ -1,0 +1,74 @@
+import AppKit
+import XCTest
+@testable import PokeTokenBar
+
+final class MenuBarPanelTests: XCTestCase {
+    func testDefaultIsCompactAndMaxStaysBelowToday() {
+        XCTAssertEqual(MenuBarPanelMetrics.minWidth, 360)
+        XCTAssertEqual(MenuBarPanelMetrics.defaultWidth, 360)
+        XCTAssertEqual(MenuBarPanelMetrics.maxWidth, 720)
+        XCTAssertLessThan(MenuBarPanelMetrics.maxWidth, TodayDeskMetrics.defaultWidth)
+        XCTAssertLessThan(MenuBarPanelMetrics.maxHeight, TodayDeskMetrics.defaultHeight)
+        XCTAssertGreaterThanOrEqual(MenuBarPanelMetrics.minHeight, 520)
+    }
+
+    func testIdentifiersAreNotSettingsPlaceholders() {
+        XCTAssertEqual(LaunchWindowPolicy.menuBarPanelIdentifier, "PokeTokenBar.MenuBarPanel")
+        XCTAssertEqual(LaunchWindowPolicy.menuBarPanelAutosaveName, "PokeTokenBarMenuBarPanel")
+        XCTAssertFalse(LaunchWindowPolicy.isSwiftUISettingsPlaceholder(
+            identifier: LaunchWindowPolicy.menuBarPanelIdentifier,
+            autosaveName: LaunchWindowPolicy.menuBarPanelAutosaveName))
+    }
+
+    @MainActor
+    func testConfigureMakesAStickyResizableWindow() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 640),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: true)
+        MenuBarPanelMetrics.configure(window)
+        XCTAssertFalse(window.hidesOnDeactivate)
+        XCTAssertFalse(window.isReleasedWhenClosed)
+        XCTAssertTrue(window.styleMask.contains(.resizable))
+        XCTAssertTrue(window.styleMask.contains(.titled))
+        XCTAssertTrue(window.styleMask.contains(.closable))
+        XCTAssertEqual(window.contentMinSize.width, 360)
+        XCTAssertEqual(window.contentMaxSize.width, 720)
+    }
+
+    func testClampedContentSizePinsToMinAndMax() {
+        XCTAssertEqual(
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 200, height: 100)),
+            NSSize(width: 360, height: 520))
+        XCTAssertEqual(
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 900, height: 900)),
+            NSSize(width: 720, height: 660))
+        XCTAssertEqual(
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 500, height: 600)),
+            NSSize(width: 500, height: 600))
+    }
+
+    func testFrameBelowStatusItemCentersAndClampsToScreen() {
+        let button = NSRect(x: 620, y: 800, width: 40, height: 22)
+        let screen = NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let size = NSSize(width: 360, height: 640)
+        let frame = MenuBarPanelMetrics.frame(below: button, size: size, visibleScreen: screen)
+        XCTAssertEqual(frame.width, 360)
+        XCTAssertEqual(frame.height, 640)
+        XCTAssertEqual(frame.midX, button.midX, accuracy: 0.5)
+        XCTAssertEqual(frame.maxY, button.minY - MenuBarPanelMetrics.statusItemGap, accuracy: 0.5)
+
+        let tight = NSRect(x: 0, y: 0, width: 300, height: 400)
+        let clamped = MenuBarPanelMetrics.frame(
+            below: NSRect(x: 0, y: 400, width: 20, height: 22),
+            size: NSSize(width: 360, height: 640),
+            visibleScreen: tight)
+        XCTAssertEqual(clamped.width, 300)
+        XCTAssertEqual(clamped.height, 400)
+        XCTAssertGreaterThanOrEqual(clamped.minX, tight.minX)
+        XCTAssertLessThanOrEqual(clamped.maxX, tight.maxX)
+        XCTAssertGreaterThanOrEqual(clamped.minY, tight.minY)
+        XCTAssertLessThanOrEqual(clamped.maxY, tight.maxY)
+    }
+}

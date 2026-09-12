@@ -10,7 +10,7 @@ struct BagView: View {
         if store.ownedItems.isEmpty {
             emptyState
         } else {
-            // 고정 높이 — 컬렉션과 동일(팝오버 재오픈 시 fitting size 축소 방지).
+            // 최소 높이 — 컬렉션과 동일. 창이 커지면 스크롤 영역이 나머지를 채운다.
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(store.ownedItems, id: \.kind) { item in
@@ -18,7 +18,7 @@ struct BagView: View {
                     }
                 }
             }
-            .frame(height: 520)
+            .frame(maxWidth: .infinity, minHeight: 520, maxHeight: .infinity)
         }
     }
 
@@ -35,7 +35,7 @@ struct BagView: View {
 }
 
 /// 아이템 1장 — 아이콘·이름·개수·설명 + 인라인 확인 사용.
-/// 확인은 인라인(버튼 morph) — .sheet/.alert 금지: transient 팝오버가 닫힐 때 고아 시트가
+/// 확인은 인라인(버튼 morph) — .sheet/.alert 금지: 창이 닫힐 때 고아 시트가
 /// 이후 클릭을 먹통내는 기존 결함(PopoverView 주석) 회피.
 @MainActor
 private struct ItemCard: View {

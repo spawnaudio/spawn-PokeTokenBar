@@ -451,6 +451,7 @@ struct EvoLineView: View {
 @MainActor
 struct CompanionHeader: View {
     let store: CompanionStore
+    @Environment(\.popoverContentWidth) private var popoverContentWidth
     // 연출 상태 — 부화/진화 순간 흰 플래시 + 스프링 스케일(본가 진화 신 오마주)
     @State private var flashOpacity: Double = 0
     @State private var celebScale: CGFloat = 1
@@ -577,7 +578,7 @@ struct CompanionHeader: View {
             if store.hasActive, !store.lineNodes.isEmpty {
                 // 폭을 안 주면 분기 라인(이브이)이 넘쳐 팝오버 콘텐츠 전체가 좌우로 잘린다.
                 EvoLineView(nodes: store.lineNodes, mysteryLabel: store.l.unknownNextEvolution, language: store.language, shiny: store.currentIsShiny,
-                            maxWidth: PopoverMetrics.contentWidth)
+                            maxWidth: popoverContentWidth)
             }
             if let g = store.justGraduated {
                 Text(store.l.graduated(g))
@@ -748,8 +749,7 @@ struct CollectionView: View {
     /// 로그 전용 희귀도 필터. 도감은 개수 단위가 종이라 자기 필터를 따로 갖는다(DexGridView).
     @State private var selectedRarity: Rarity?
 
-    /// 도감·로그 공통 높이 — 상점·가방과 같은 520. 세그먼트를 전환할 때도, 탭을 넘나들 때도
-    /// 팝오버가 리사이즈되지 않는다. 격자·로그는 이 높이 안에서 스크롤한다.
+    /// 도감·로그 공통 최소 높이 — 상점·가방과 같음. 창이 커지면 격자·로그가 나머지를 채운다.
     private static let contentHeight: CGFloat = 520
 
     /// 선택된 희귀도만 노출(없으면 전체). 상단 캡슐 토글로 설정.
@@ -770,7 +770,7 @@ struct CollectionView: View {
                 ])
                 if nav.showingCollectionLog { catchLog } else { DexGridView(store: store) }
             }
-            .frame(height: Self.contentHeight)
+            .frame(maxWidth: .infinity, minHeight: Self.contentHeight, maxHeight: .infinity)
         }
     }
 
@@ -1320,6 +1320,7 @@ private struct DexSpeciesCell: View {
 private struct DexEntryRow: View {
     let store: CompanionStore
     let entry: DexEntry
+    @Environment(\.popoverContentWidth) private var popoverContentWidth
     @State private var resolved: [Int: String] = [:]
 
     /// 카드 안쪽 여백. 진화 라인이 쓸 수 있는 폭 계산과 단일 소스를 공유한다.
@@ -1366,7 +1367,7 @@ private struct DexEntryRow: View {
             EvoLineView(nodes: entry.chainOrder.map { EvoLineItem(.species($0), .done) },
                         mysteryLabel: store.l.unknownNextEvolution, language: store.language, thumb: 56,
                         shiny: entry.isShiny, names: names,
-                        maxWidth: PopoverMetrics.contentWidth - Self.cardPadding * 2)
+                        maxWidth: popoverContentWidth - Self.cardPadding * 2)
             if let caughtAt = entry.caughtAt {
                 Text(caughtAt, style: .relative).font(.system(size: 9)).foregroundStyle(.tertiary)
             }
