@@ -13,14 +13,6 @@ private enum LinearRootTab: Hashable {
     case issues
     case projects
     case initiatives
-
-    var symbol: String {
-        switch self {
-        case .issues: return LinearChromeSymbol.issue
-        case .projects: return LinearChromeSymbol.project
-        case .initiatives: return LinearChromeSymbol.initiative
-        }
-    }
 }
 
 @MainActor
@@ -104,20 +96,11 @@ struct LinearIntegrationView: View {
                 .disabled(!store.linearIntegrationEnabled || !store.linearAPIKeyConfigured || store.isRefreshingLinearIssues)
             }
 
-            HStack {
-                Image(systemName: selectedRoot.symbol)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                    .accessibilityHidden(true)
-                Picker("", selection: $selectedRoot) {
-                    Text(l.linearIssuesTab).tag(LinearRootTab.issues)
-                    Text(l.linearProjectsTab).tag(LinearRootTab.projects)
-                    Text(l.linearInitiativesTab).tag(LinearRootTab.initiatives)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-            }
+            TahoeTabBar(selection: $selectedRoot, items: [
+                TahoeTabItem(.issues, title: l.linearIssuesTab, symbol: LinearChromeSymbol.issue),
+                TahoeTabItem(.projects, title: l.linearProjectsTab, symbol: LinearChromeSymbol.project),
+                TahoeTabItem(.initiatives, title: l.linearInitiativesTab, symbol: LinearChromeSymbol.initiative),
+            ])
 
             if !store.linearIntegrationEnabled || !store.linearAPIKeyConfigured {
                 Text(l.linearIssuesNeedsSetup)
@@ -126,26 +109,20 @@ struct LinearIntegrationView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 if selectedRoot == .issues {
-                    Picker("", selection: $selectedIssuesTab) {
-                        Text(l.linearInProgressTab).tag(LinearIssuesTab.inProgress)
-                        Text(l.linearCompletedTodayTab).tag(LinearIssuesTab.completedToday)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+                    TahoeTabBar(selection: $selectedIssuesTab, items: [
+                        TahoeTabItem(.inProgress, title: l.linearInProgressTab),
+                        TahoeTabItem(.completedToday, title: l.linearCompletedTodayTab),
+                    ])
                 } else if selectedRoot == .projects {
-                    Picker("", selection: $selectedProjectsTab) {
-                        Text(l.linearInProgressTab).tag(LinearProjectsTab.inProgress)
-                        Text(l.linearProductionTab).tag(LinearProjectsTab.production)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+                    TahoeTabBar(selection: $selectedProjectsTab, items: [
+                        TahoeTabItem(.inProgress, title: l.linearInProgressTab),
+                        TahoeTabItem(.production, title: l.linearProductionTab),
+                    ])
                 } else if selectedRoot == .initiatives {
-                    Picker("", selection: $selectedInitiativesTab) {
-                        Text(l.linearActiveTab).tag(LinearInitiativesTab.active)
-                        Text(l.linearPlannedTab).tag(LinearInitiativesTab.planned)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+                    TahoeTabBar(selection: $selectedInitiativesTab, items: [
+                        TahoeTabItem(.active, title: l.linearActiveTab),
+                        TahoeTabItem(.planned, title: l.linearPlannedTab),
+                    ])
                 }
 
                 if let updated = store.linearIssuesUpdatedAt {

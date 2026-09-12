@@ -62,7 +62,7 @@ extension View {
         modifier(PopoverCardModifier())
     }
 
-    /// Tahoe glass on the bottom bar only. Older macOS keeps an ultra-thin material bar.
+    /// Tahoe glass on the bottom tab strip only. Older macOS keeps an ultra-thin material bar.
     @ViewBuilder
     func popoverBottomBarChrome() -> some View {
         if #available(macOS 26, *) {
@@ -112,6 +112,104 @@ extension View {
             self.glassEffect(.regular, in: shape)
         } else {
             self.background(Color(nsColor: .windowBackgroundColor), in: shape)
+        }
+    }
+}
+
+enum TahoeChromeSymbol {
+    /// Trailing menu affordance on Tahoe popup buttons.
+    static let menuChevron = "chevron.down"
+}
+
+/// Glass popup label: current value plus a trailing chevron, matching Tahoe buttons.
+@MainActor
+struct TahoeMenuLabel: View {
+    let text: String
+    var expands: Bool = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(text)
+                .lineLimit(1)
+            if expands { Spacer(minLength: 4) }
+            Image(systemName: TahoeChromeSymbol.menuChevron)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .imageScale(.small)
+                .accessibilityHidden(true)
+        }
+    }
+}
+
+/// Menu-styled picker that renders as a Tahoe glass button with a chevron.
+@MainActor
+struct TahoePopupMenu<Selection: Hashable, Content: View>: View {
+    let accessibilityLabel: String
+    let selectionTitle: String
+    @Binding var selection: Selection
+    var size: ControlSize = .small
+    var expands: Bool = false
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Menu {
+            Picker(accessibilityLabel, selection: $selection) {
+                content
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            TahoeMenuLabel(text: selectionTitle, expands: expands)
+        }
+        .menuIndicator(.hidden)
+        .tahoeButtonStyle(.regular)
+        .controlSize(size)
+        .frame(maxWidth: expands ? .infinity : nil, alignment: .leading)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(selectionTitle)
+    }
+}
+
+struct TahoeTabItem<Value: Hashable> {
+    let value: Value
+    let title: String
+    var symbol: String? = nil
+
+    init(_ value: Value, title: String, symbol: String? = nil) {
+        self.value = value
+        self.title = title
+        self.symbol = symbol
+    }
+}
+
+/// Selected = prominent glass, idle = regular glass. Replaces segmented pickers.
+@MainActor
+struct TahoeTabBar<Value: Hashable>: View {
+    @Binding var selection: Value
+    var size: ControlSize = .small
+    let items: [TahoeTabItem<Value>]
+
+    var body: some View {
+        TahoeGlassCluster(spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(items, id: \.value) { item in
+                    let selected = selection == item.value
+                    Button {
+                        selection = item.value
+                    } label: {
+                        if let symbol = item.symbol {
+                            Label(item.title, systemImage: symbol)
+                        } else {
+                            Text(item.title)
+                        }
+                    }
+                    .tahoeButtonStyle(selected ? .prominent : .regular)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(size)
+                    .accessibilityLabel(item.title)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
         }
     }
 }

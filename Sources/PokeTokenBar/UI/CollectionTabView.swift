@@ -11,13 +11,11 @@ struct CollectionTabView: View {
     var body: some View {
         @Bindable var nav = navigation
         VStack(alignment: .leading, spacing: 8) {
-            Picker("", selection: $nav.collectionSegment) {
-                Text(l.bag).tag(CollectionSegment.bag)
-                Text(l.dexSegment).tag(CollectionSegment.dex)
-                Text(l.shop).tag(CollectionSegment.shop)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            TahoeTabBar(selection: $nav.collectionSegment, items: [
+                TahoeTabItem(.bag, title: l.bag),
+                TahoeTabItem(.dex, title: l.dexSegment),
+                TahoeTabItem(.shop, title: l.shop),
+            ])
 
             Group {
                 switch nav.collectionSegment {

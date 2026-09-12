@@ -187,7 +187,11 @@ struct TodayDeskView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.caption2).foregroundStyle(.tertiary)
             HStack(spacing: 4) {
-                Picker(title, selection: selection) {
+                TahoePopupMenu(
+                    accessibilityLabel: title,
+                    selectionTitle: l.minutesValue(selection.wrappedValue),
+                    selection: selection
+                ) {
                     ForEach(presets, id: \.self) { minutes in
                         Text(l.minutesValue(minutes)).tag(minutes)
                     }
@@ -195,9 +199,6 @@ struct TodayDeskView: View {
                         Text(l.minutesValue(selection.wrappedValue)).tag(selection.wrappedValue)
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .controlSize(.small)
                 Stepper("", value: selection, in: SessionXP.minMinutes...SessionXP.maxMinutes)
                     .labelsHidden()
                     .controlSize(.mini)
