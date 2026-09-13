@@ -645,15 +645,15 @@ struct FloatingPetView: View {
             }
 
             HStack(alignment: .bottom, spacing: FloatingPetController.islandGap) {
-                if session.isActive || session.pomodoroSetupOpen {
+                if session.isActive {
                     if showsIslandColumn {
                         SessionIslandView()
                     }
-                    if store.floatingPetIslandFolded && session.isActive {
+                    if store.floatingPetIslandFolded {
                         foldedMiniClock
                     }
+                    islandFoldChevron
                 }
-                islandFoldChevron
                 SpriteView(speciesID: subject.speciesID, size: size, animated: animated,
                            shiny: subject.isShiny,
                            minFrameDelay: store.animationQuality.frameFloor)
@@ -668,7 +668,6 @@ struct FloatingPetView: View {
     }
 
     private var showsIslandColumn: Bool {
-        if session.pomodoroSetupOpen { return true }
         if !store.floatingPetIslandFolded { return true }
         return session.forfeitPrompt != nil
             || session.resetPrompt
@@ -714,22 +713,9 @@ struct FloatingPetView: View {
 
     private var islandFoldChevron: some View {
         let l = companion.l
-        let setup = session.pomodoroSetupOpen
-        let folded = store.floatingPetIslandFolded || (!session.isActive && !setup)
-        let help: String = {
-            if session.isActive { return folded ? l.expandTimer : l.collapseTimer }
-            if setup { return l.cancel }
-            return l.pomoTimer
-        }()
+        let folded = store.floatingPetIslandFolded
         return Button {
-            if session.isActive {
-                store.floatingPetIslandFolded.toggle()
-            } else if setup {
-                session.cancelPomodoroSetup()
-            } else {
-                session.openPomodoroSetup()
-                store.floatingPetIslandFolded = false
-            }
+            store.floatingPetIslandFolded.toggle()
         } label: {
             Image(systemName: folded ? "chevron.left" : "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
@@ -748,8 +734,8 @@ struct FloatingPetView: View {
             width: FloatingPetController.islandFoldChevronSize,
             height: FloatingPetController.islandFoldChevronSize)
         .contentShape(Rectangle())
-        .help(help)
-        .accessibilityLabel(help)
+        .help(folded ? l.expandTimer : l.collapseTimer)
+        .accessibilityLabel(folded ? l.expandTimer : l.collapseTimer)
     }
 
     static func hoverTooltip(todayTokens: Int, limitUtilization: Double?,

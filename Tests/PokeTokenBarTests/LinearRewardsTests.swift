@@ -185,6 +185,44 @@ final class LinearRewardsTests: XCTestCase {
         XCTAssertTrue(dashboard.initiatives.isEmpty)
     }
 
+    func testParseIssueDashboardSplitsPlannedAndTodoFromOpenIssues() throws {
+        let json = """
+        {"data":{
+          "completedRecent":{"nodes":[]},
+          "inProgress":{"nodes":[
+            {"id":"issue-start","identifier":"ENG-1","title":"Doing",
+             "priority":2,"state":{"name":"In Progress","type":"started"}},
+            {"id":"issue-todo","identifier":"ENG-2","title":"Inbox",
+             "priority":3,"state":{"name":"Todo","type":"unstarted"}},
+            {"id":"issue-backlog","identifier":"ENG-3","title":"Later",
+             "priority":4,"state":{"name":"Backlog","type":"backlog"}},
+            {"id":"issue-planned","identifier":"ENG-4","title":"Named planned",
+             "priority":1,"state":{"name":"Planned","type":"unstarted"}},
+            {"id":"issue-triage","identifier":"ENG-5","title":"Triage",
+             "priority":0,"state":{"name":"Triage","type":"triage"}},
+            {"id":"issue-done","identifier":"ENG-6","title":"Done",
+             "priority":1,"state":{"name":"Done","type":"completed"}}
+          ]}
+        }}
+        """.data(using: .utf8)!
+
+        let dashboard = try LinearClient.parseIssueDashboard(json)
+        XCTAssertEqual(dashboard.inProgress.map(\.id), ["issue-start"])
+        XCTAssertEqual(dashboard.todo.map(\.id), ["issue-todo"])
+        XCTAssertEqual(dashboard.planned.map(\.id), ["issue-planned", "issue-backlog", "issue-triage"])
+        XCTAssertTrue(dashboard.completedRecent.isEmpty)
+    }
+
+    func testOpenIssueBucketMapsWorkflowTypes() {
+        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "started", stateName: "In Progress"), .inProgress)
+        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "unstarted", stateName: "Todo"), .todo)
+        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "backlog", stateName: "Backlog"), .planned)
+        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "triage", stateName: "Triage"), .planned)
+        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "unstarted", stateName: "Planned"), .planned)
+        XCTAssertNil(LinearClient.openIssueBucket(stateType: "completed", stateName: "Done"))
+        XCTAssertNil(LinearClient.openIssueBucket(stateType: "canceled", stateName: "Canceled"))
+    }
+
     func testParseIssueDashboardKeepsInProgressProjectsAndInitiatives() throws {
         let json = """
         {"data":{
@@ -469,6 +507,7 @@ final class LinearRewardsTests: XCTestCase {
         XCTAssertTrue(issuesQuery.contains("DateTimeOrDuration!"))
         XCTAssertTrue(issuesQuery.contains("states { nodes { id name type position } }"))
         XCTAssertTrue(issuesQuery.contains("state { id name type }"))
+        XCTAssertTrue(issuesQuery.contains("filter: { state: { type: { in: [\"triage\", \"backlog\", \"unstarted\", \"started\"] } } }"))
         XCTAssertFalse(issuesQuery.contains("projects("))
         XCTAssertTrue(containersQuery.contains("projects"))
         XCTAssertTrue(containersQuery.contains("initiatives"))

@@ -26,6 +26,14 @@ enum MenuBarPanelMetrics {
     /// Room for traffic lights on a unified hidden titlebar.
     static let detachedTrafficLightInset: CGFloat = 76
     static let detachedKey = "menuBarPanelDetached"
+    static let sidebarWidthKey = "menuBarSidebarWidth"
+    static let sidebarCollapsedKey = "menuBarSidebarCollapsed"
+    static let sidebarDefaultWidth: CGFloat = 176
+    static let sidebarMinWidth: CGFloat = 148
+    static let sidebarMaxWidth: CGFloat = 260
+    static let splitterWidth: CGFloat = TodayDeskMetrics.splitterWidth
+    static let collapsedStripWidth: CGFloat = detachedTrafficLightInset
+    static let sidebarTrafficLightClearance: CGFloat = 36
 
     static var defaultContentSize: NSSize {
         NSSize(width: defaultWidth, height: defaultHeight)
@@ -48,14 +56,86 @@ enum MenuBarPanelMetrics {
         detached ? detachedMaxHeight : attachedMaxHeight
     }
 
-    static var shellFill: NSColor { .controlBackgroundColor }
-    static var canvasFill: NSColor { .underPageBackgroundColor }
+    static func clampedSidebarWidth(_ width: CGFloat) -> CGFloat {
+        min(max(width, sidebarMinWidth), sidebarMaxWidth)
+    }
+
+    static func minContentWidth(
+        detached: Bool,
+        sidebarCollapsed: Bool = false,
+        sidebarWidth: CGFloat = sidebarDefaultWidth
+    ) -> CGFloat {
+        guard detached else { return minWidth }
+        if sidebarCollapsed { return minWidth + collapsedStripWidth }
+        return minWidth + clampedSidebarWidth(sidebarWidth) + splitterWidth
+    }
+
+    /// Linear light: sidebar `#F3F4F6`, page white. Dark keeps a matching split.
+    static var shellFill: NSColor {
+        dynamicColor(
+            name: "PTBShellFill",
+            light: NSColor(srgbRed: 0.953, green: 0.957, blue: 0.965, alpha: 1),
+            dark: NSColor(srgbRed: 0.141, green: 0.145, blue: 0.161, alpha: 1))
+    }
+
+    static var canvasFill: NSColor {
+        dynamicColor(
+            name: "PTBCanvasFill",
+            light: .white,
+            dark: NSColor(srgbRed: 0.090, green: 0.094, blue: 0.106, alpha: 1))
+    }
+
+    static var cardFill: NSColor {
+        dynamicColor(
+            name: "PTBCardFill",
+            light: .white,
+            dark: NSColor.white.withAlphaComponent(0.06))
+    }
+
+    static var chipFill: NSColor {
+        dynamicColor(
+            name: "PTBChipFill",
+            light: NSColor.black.withAlphaComponent(0.04),
+            dark: NSColor.white.withAlphaComponent(0.06))
+    }
+
+    static var selectedFill: NSColor {
+        dynamicColor(
+            name: "PTBSelectedFill",
+            light: NSColor.black.withAlphaComponent(0.08),
+            dark: NSColor.white.withAlphaComponent(0.12))
+    }
+
+    static var hairline: NSColor {
+        dynamicColor(
+            name: "PTBHairline",
+            light: NSColor.black.withAlphaComponent(0.10),
+            dark: NSColor.white.withAlphaComponent(0.16))
+    }
+
+    static var hairlineSelected: NSColor {
+        dynamicColor(
+            name: "PTBHairlineSelected",
+            light: NSColor.black.withAlphaComponent(0.14),
+            dark: NSColor.white.withAlphaComponent(0.22))
+    }
+
+    private static func dynamicColor(name: String, light: NSColor, dark: NSColor) -> NSColor {
+        NSColor(name: name) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+        }
+    }
 
     /// Dragging does not detach. Only the in-panel button does.
     static func shouldPlaceBelowStatusItem(detached: Bool) -> Bool { !detached }
 
     @MainActor
-    static func configure(_ window: NSWindow, detached: Bool) {
+    static func configure(
+        _ window: NSWindow,
+        detached: Bool,
+        sidebarCollapsed: Bool = false,
+        sidebarWidth: CGFloat = sidebarDefaultWidth
+    ) {
         window.styleMask = detached ? detachedStyleMask : attachedStyleMask
         window.isMovable = detached
         window.isMovableByWindowBackground = detached
@@ -63,7 +143,12 @@ enum MenuBarPanelMetrics {
         window.hidesOnDeactivate = false
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
-        window.contentMinSize = NSSize(width: minWidth, height: minHeight(detached: detached))
+        window.contentMinSize = NSSize(
+            width: minContentWidth(
+                detached: detached,
+                sidebarCollapsed: sidebarCollapsed,
+                sidebarWidth: sidebarWidth),
+            height: minHeight(detached: detached))
         window.contentMaxSize = NSSize(
             width: maxWidth(detached: detached),
             height: maxHeight(detached: detached))
@@ -94,9 +179,21 @@ enum MenuBarPanelMetrics {
         view.layer?.backgroundColor = detached ? nil : NSColor.clear.cgColor
     }
 
-    static func clampedContentSize(_ size: NSSize, detached: Bool = true) -> NSSize {
+    static func clampedContentSize(
+        _ size: NSSize,
+        detached: Bool = true,
+        sidebarCollapsed: Bool = false,
+        sidebarWidth: CGFloat = sidebarDefaultWidth
+    ) -> NSSize {
         NSSize(
-            width: min(max(size.width, minWidth), maxWidth(detached: detached)),
+            width: min(
+                max(
+                    size.width,
+                    minContentWidth(
+                        detached: detached,
+                        sidebarCollapsed: sidebarCollapsed,
+                        sidebarWidth: sidebarWidth)),
+                maxWidth(detached: detached)),
             height: min(max(size.height, minHeight(detached: detached)), maxHeight(detached: detached)))
     }
 
@@ -238,7 +335,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         window.identifier = NSUserInterfaceItemIdentifier(LaunchWindowPolicy.menuBarPanelIdentifier)
         window.delegate = self
         window.contentView = hostedView()
-        MenuBarPanelMetrics.configure(window, detached: usage.menuBarPanelDetached)
+        configureWindow(window)
         return window
     }
 
@@ -250,13 +347,23 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
 
     private func applyChrome() {
         guard let window else { return }
-        MenuBarPanelMetrics.configure(window, detached: usage.menuBarPanelDetached)
+        configureWindow(window)
         applyTitle()
+    }
+
+    private func configureWindow(_ window: NSWindow) {
+        MenuBarPanelMetrics.configure(
+            window,
+            detached: usage.menuBarPanelDetached,
+            sidebarCollapsed: usage.menuBarSidebarCollapsed,
+            sidebarWidth: CGFloat(usage.menuBarSidebarWidth))
     }
 
     private func observeDetach() {
         withObservationTracking {
             _ = usage.menuBarPanelDetached
+            _ = usage.menuBarSidebarCollapsed
+            _ = usage.menuBarSidebarWidth
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
@@ -276,7 +383,10 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         guard let window else { return }
         let current = window.contentRect(forFrameRect: window.frame).size
         let clamped = MenuBarPanelMetrics.clampedContentSize(
-            current, detached: usage.menuBarPanelDetached)
+            current,
+            detached: usage.menuBarPanelDetached,
+            sidebarCollapsed: usage.menuBarSidebarCollapsed,
+            sidebarWidth: CGFloat(usage.menuBarSidebarWidth))
         if clamped != current {
             window.setContentSize(clamped)
         }

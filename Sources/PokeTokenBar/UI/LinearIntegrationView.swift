@@ -1,60 +1,27 @@
 import AppKit
 import SwiftUI
 
-/// Closest SF Symbols to Linear’s chrome (issue circle / project hexagon / initiative flag).
-private enum LinearChromeSymbol {
-    static let issue = "circle"
-    static let project = "hexagon"
-    static let initiative = "flag"
-}
-
-@MainActor
-private enum LinearRootTab: Hashable {
-    case issues
-    case projects
-    case initiatives
-}
-
-@MainActor
-private enum LinearIssuesTab: Hashable {
-    case inProgress
-    case completedToday
-}
-
-@MainActor
-private enum LinearProjectsTab: Hashable {
-    case inProgress
-    case production
-}
-
-@MainActor
-private enum LinearInitiativesTab: Hashable {
-    case active
-    case planned
-}
-
 @MainActor
 struct LinearIntegrationView: View {
     let store: UsageStore
     @Environment(CompanionStore.self) private var companion
     @Environment(PopoverNavigation.self) private var nav
-    @State private var selectedRoot: LinearRootTab = .issues
-    @State private var selectedIssuesTab: LinearIssuesTab = .inProgress
-    @State private var selectedProjectsTab: LinearProjectsTab = .inProgress
-    @State private var selectedInitiativesTab: LinearInitiativesTab = .active
+    @Environment(\.menuBarSidebarLayout) private var sidebarLayout
 
     private var l: L { companion.l }
 
     private var visibleIssues: [LinearIssueSummary] {
-        switch selectedIssuesTab {
+        switch nav.linearIssuesTab {
         case .completedToday: return store.linearCompletedTodayIssues
         case .inProgress: return store.linearInProgressIssues
+        case .planned: return store.linearPlannedIssues
+        case .todo: return store.linearTodoIssues
         }
     }
 
     private var visibleProjects: [LinearProjectSummary] {
         store.linearProjects.filter { project in
-            switch selectedProjectsTab {
+            switch nav.linearProjectsTab {
             case .inProgress:
                 return LinearClient.matchesProjectInProgressTab(
                     name: project.statusName, type: project.statusType)
@@ -67,7 +34,7 @@ struct LinearIntegrationView: View {
 
     private var visibleInitiatives: [LinearInitiativeSummary] {
         store.linearInitiatives.filter { initiative in
-            switch selectedInitiativesTab {
+            switch nav.linearInitiativesTab {
             case .active:
                 return LinearClient.matchesInitiativeActive(name: initiative.statusName)
             case .planned:
@@ -77,6 +44,7 @@ struct LinearIntegrationView: View {
     }
 
     var body: some View {
+        @Bindable var nav = nav
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 NewLinearIssueButton(showsTitle: true)
@@ -96,11 +64,13 @@ struct LinearIntegrationView: View {
                 .disabled(!store.linearIntegrationEnabled || !store.linearAPIKeyConfigured || store.isRefreshingLinearIssues)
             }
 
-            TahoeTabBar(selection: $selectedRoot, items: [
-                TahoeTabItem(.issues, title: l.linearIssuesTab, symbol: LinearChromeSymbol.issue),
-                TahoeTabItem(.projects, title: l.linearProjectsTab, symbol: LinearChromeSymbol.project),
-                TahoeTabItem(.initiatives, title: l.linearInitiativesTab, symbol: LinearChromeSymbol.initiative),
-            ])
+            if !sidebarLayout {
+                TahoeTabBar(selection: $nav.linearRoot, items: [
+                    TahoeTabItem(.issues, title: l.linearIssuesTab, symbol: LinearChromeSymbol.issue),
+                    TahoeTabItem(.projects, title: l.linearProjectsTab, symbol: LinearChromeSymbol.project),
+                    TahoeTabItem(.initiatives, title: l.linearInitiativesTab, symbol: LinearChromeSymbol.initiative),
+                ])
+            }
 
             if !store.linearIntegrationEnabled || !store.linearAPIKeyConfigured {
                 Text(l.linearIssuesNeedsSetup)
@@ -108,21 +78,25 @@ struct LinearIntegrationView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                if selectedRoot == .issues {
-                    TahoeTabBar(selection: $selectedIssuesTab, items: [
-                        TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: "circle"),
-                        TahoeTabItem(.completedToday, title: l.linearCompletedTodayTab, symbol: "checkmark"),
-                    ])
-                } else if selectedRoot == .projects {
-                    TahoeTabBar(selection: $selectedProjectsTab, items: [
-                        TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: LinearChromeSymbol.project),
-                        TahoeTabItem(.production, title: l.linearProductionTab, symbol: "cube"),
-                    ])
-                } else if selectedRoot == .initiatives {
-                    TahoeTabBar(selection: $selectedInitiativesTab, items: [
-                        TahoeTabItem(.active, title: l.linearActiveTab, symbol: LinearChromeSymbol.initiative),
-                        TahoeTabItem(.planned, title: l.linearPlannedTab, symbol: "calendar"),
-                    ])
+                if !sidebarLayout {
+                    if nav.linearRoot == .issues {
+                        TahoeTabBar(selection: $nav.linearIssuesTab, items: [
+                            TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: "circle"),
+                            TahoeTabItem(.planned, title: l.linearPlannedTab, symbol: "calendar"),
+                            TahoeTabItem(.todo, title: l.linearTodoTab, symbol: "circle.dotted"),
+                            TahoeTabItem(.completedToday, title: l.linearCompletedTodayTab, symbol: "checkmark"),
+                        ])
+                    } else if nav.linearRoot == .projects {
+                        TahoeTabBar(selection: $nav.linearProjectsTab, items: [
+                            TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: LinearChromeSymbol.project),
+                            TahoeTabItem(.production, title: l.linearProductionTab, symbol: "cube"),
+                        ])
+                    } else if nav.linearRoot == .initiatives {
+                        TahoeTabBar(selection: $nav.linearInitiativesTab, items: [
+                            TahoeTabItem(.active, title: l.linearActiveTab, symbol: LinearChromeSymbol.initiative),
+                            TahoeTabItem(.planned, title: l.linearPlannedTab, symbol: "calendar"),
+                        ])
+                    }
                 }
 
                 if let updated = store.linearIssuesUpdatedAt {
@@ -142,20 +116,20 @@ struct LinearIntegrationView: View {
                         .foregroundStyle(.orange)
                 }
 
-                switch selectedRoot {
+                switch nav.linearRoot {
                 case .issues:
                     issuesList
                 case .projects:
                     containerList(
                         items: visibleProjects.map { LinearContainerRow(project: $0) },
-                        emptyText: selectedProjectsTab == .production
+                        emptyText: nav.linearProjectsTab == .production
                             ? l.linearProjectsEmptyProduction
                             : l.linearProjectsEmpty,
                         openHelp: l.linearOpenProject)
                 case .initiatives:
                     containerList(
                         items: visibleInitiatives.map { LinearContainerRow(initiative: $0) },
-                        emptyText: selectedInitiativesTab == .planned
+                        emptyText: nav.linearInitiativesTab == .planned
                             ? l.linearInitiativesEmptyPlanned
                             : l.linearInitiativesEmpty,
                         openHelp: l.linearOpenInitiative)
@@ -172,7 +146,7 @@ struct LinearIntegrationView: View {
     @ViewBuilder
     private var issuesList: some View {
         if visibleIssues.isEmpty {
-            Text(selectedIssuesTab == .completedToday ? l.linearIssuesEmptyCompleted : l.linearIssuesEmptyInProgress)
+            Text(issuesEmptyText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -188,6 +162,15 @@ struct LinearIntegrationView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var issuesEmptyText: String {
+        switch nav.linearIssuesTab {
+        case .completedToday: return l.linearIssuesEmptyCompleted
+        case .inProgress: return l.linearIssuesEmptyInProgress
+        case .planned: return l.linearIssuesEmptyPlanned
+        case .todo: return l.linearIssuesEmptyTodo
         }
     }
 

@@ -71,7 +71,13 @@ final class MenuBarPanelTests: XCTestCase {
             NSSize(width: 360, height: 520))
         XCTAssertEqual(
             MenuBarPanelMetrics.clampedContentSize(NSSize(width: 200, height: 100), detached: true),
-            NSSize(width: 360, height: 400))
+            NSSize(width: MenuBarPanelMetrics.minContentWidth(detached: true), height: 400))
+        XCTAssertEqual(
+            MenuBarPanelMetrics.clampedContentSize(
+                NSSize(width: 200, height: 100),
+                detached: true,
+                sidebarCollapsed: true),
+            NSSize(width: MenuBarPanelMetrics.minContentWidth(detached: true, sidebarCollapsed: true), height: 400))
         XCTAssertEqual(
             MenuBarPanelMetrics.clampedContentSize(NSSize(width: 900, height: 900), detached: false),
             NSSize(width: 500, height: 660))
@@ -143,25 +149,27 @@ final class MenuBarPanelTests: XCTestCase {
         XCTAssertTrue(popover.contains("shellFill"))
         XCTAssertTrue(popover.contains("attachedCornerRadius"))
         XCTAssertTrue(popover.contains("shellGap"))
-        XCTAssertTrue(chrome.contains("struct PopoverShellToolbar"))
-        XCTAssertTrue(chrome.contains("chevron.left"))
-        XCTAssertTrue(chrome.contains("ViewThatFits"))
-        XCTAssertTrue(popover.contains("ignoresSafeArea"))
+        XCTAssertTrue(chrome.contains("struct PopoverChromeActionButtons"))
+        XCTAssertTrue(chrome.contains("struct MenuBarSidebarNav"))
+        XCTAssertTrue(chrome.contains("struct ChromeColumnSplitter"))
+        XCTAssertTrue(popover.contains("menuBarSidebarLayout"))
+        XCTAssertTrue(popover.contains("PopoverChromeActionButtons(spreadsAcrossBar: true)"))
+        XCTAssertTrue(popover.contains("MenuBarSidebarNav"))
     }
 
-    func testFocusTabKeepsPomodoroUsageAndTimeXPSeparate() throws {
+    func testFocusTabKeepsUsageAndTimeXPSeparate() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources/PokeTokenBar/UI")
         let focus = try String(contentsOf: root.appendingPathComponent("FocusTabView.swift"), encoding: .utf8)
-        XCTAssertTrue(focus.contains("pomodoroSection"))
+        XCTAssertFalse(focus.contains("pomodoroSection"))
+        XCTAssertFalse(focus.contains("session.openPomodoroSetup()"))
+        XCTAssertFalse(focus.contains("l.pomoTimer"))
         XCTAssertTrue(focus.contains("linearSection"))
         XCTAssertTrue(focus.contains("showsRefresh: true"))
         XCTAssertTrue(focus.contains("TimeXPView"))
-        XCTAssertTrue(focus.contains("session.openPomodoroSetup()"))
-        XCTAssertTrue(focus.contains("l.pomoTimer"))
         XCTAssertTrue(focus.contains("CompanionHeader(store: companion)"))
         XCTAssertTrue(focus.contains(".popoverCard()"))
         let companionRange = try XCTUnwrap(focus.range(of: "CompanionHeader(store: companion)"))

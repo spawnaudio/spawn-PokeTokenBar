@@ -25,6 +25,84 @@ enum PopoverTab: Hashable, CaseIterable {
 
 enum CollectionSegment: Hashable, CaseIterable {
     case bag, dex, shop
+
+    var symbol: String {
+        switch self {
+        case .bag: return "bag"
+        case .dex: return "square.grid.2x2"
+        case .shop: return "cart"
+        }
+    }
+
+    func title(_ l: L) -> String {
+        switch self {
+        case .bag: return l.bag
+        case .dex: return l.dexSegment
+        case .shop: return l.shop
+        }
+    }
+}
+
+enum LinearRootTab: Hashable, CaseIterable {
+    case issues, projects, initiatives
+}
+
+enum LinearIssuesTab: Hashable, CaseIterable {
+    case inProgress, planned, todo, completedToday
+
+    var symbol: String {
+        switch self {
+        case .inProgress: return LinearChromeSymbol.issue
+        case .planned: return "calendar"
+        case .todo: return "circle.dotted"
+        case .completedToday: return "checkmark"
+        }
+    }
+
+    func title(_ l: L) -> String {
+        switch self {
+        case .inProgress: return l.linearInProgressTab
+        case .planned: return l.linearPlannedTab
+        case .todo: return l.linearTodoTab
+        case .completedToday: return l.linearCompletedTodayTab
+        }
+    }
+}
+
+enum LinearProjectsTab: Hashable, CaseIterable {
+    case inProgress, production
+
+    var symbol: String {
+        switch self {
+        case .inProgress: return LinearChromeSymbol.project
+        case .production: return "cube"
+        }
+    }
+
+    func title(_ l: L) -> String {
+        switch self {
+        case .inProgress: return l.linearInProgressTab
+        case .production: return l.linearProductionTab
+        }
+    }
+}
+
+enum LinearInitiativesTab: Hashable, CaseIterable {
+    case active, planned
+
+    var symbol: String {
+        switch self {
+        case .active: return LinearChromeSymbol.initiative
+        case .planned: return "calendar"
+        }
+    }
+
+    func title(_ l: L) -> String {
+        switch self {
+        case .active: return l.linearActiveTab
+        case .planned: return l.linearPlannedTab
+        }
+    }
 }
 
 /// Compact / test layout width. The live menu-bar panel is a resizable window
@@ -40,10 +118,20 @@ private enum PopoverContentWidthKey: EnvironmentKey {
     static let defaultValue: CGFloat = PopoverMetrics.contentWidth
 }
 
+private enum MenuBarSidebarLayoutKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     var popoverContentWidth: CGFloat {
         get { self[PopoverContentWidthKey.self] }
         set { self[PopoverContentWidthKey.self] = newValue }
+    }
+
+    /// Detached menu-bar window: root and nested tabs live in the sidebar.
+    var menuBarSidebarLayout: Bool {
+        get { self[MenuBarSidebarLayoutKey.self] }
+        set { self[MenuBarSidebarLayoutKey.self] = newValue }
     }
 }
 
@@ -59,6 +147,10 @@ final class PopoverNavigation {
     var showingCollectionLog = false
     /// Bag | Dex | Shop. Default Dex. Reset keeps the last segment; representative pick forces Dex.
     var collectionSegment: CollectionSegment = .dex
+    var linearRoot: LinearRootTab = .issues
+    var linearIssuesTab: LinearIssuesTab = .inProgress
+    var linearProjectsTab: LinearProjectsTab = .inProgress
+    var linearInitiativesTab: LinearInitiativesTab = .active
     /// 프로바이더 탭 선택 — reset() 대상이 아님(팝오버를 다시 열어도 보던 서비스 유지).
     var providerID: String?
     /// 설정을 열 때 고급 섹션을 펼친 채로 시작할지. 세션 키 행이 접힌 disclosure 안에 살아서,
@@ -84,6 +176,12 @@ final class PopoverNavigation {
     func showFocus() {
         showSettings = false
         tab = .focus
+    }
+
+    func showLinear(_ root: LinearRootTab) {
+        showSettings = false
+        linearRoot = root
+        tab = .linear
     }
 
     /// Linear pin: start (or switch) the session and reveal Focus. Does not open Today.
@@ -119,47 +217,14 @@ struct PopoverView: View {
     var body: some View {
         // NOTE: 설정을 .sheet 로 띄우면 창이 닫힐 때 시트가 고아로 남아
         // 이후 버튼 클릭을 차단할 수 있음 — 내부 화면 전환으로 처리
-        @Bindable var nav = nav
         let detached = store.menuBarPanelDetached
-        let gap = MenuBarPanelMetrics.shellGap
         GeometryReader { geo in
-            let panelPad = PopoverMetrics.padding
-            let leadingChrome = detached ? MenuBarPanelMetrics.detachedTrafficLightInset : gap
-            let contentWidth = max(0, geo.size.width - gap - leadingChrome - panelPad * 2)
-            VStack(spacing: 0) {
-                PopoverShellToolbar()
-                    .padding(.leading, leadingChrome)
-                    .padding(.trailing, gap)
-                    .padding(.top, detached ? 2 : 6)
-                    .padding(.bottom, 4)
-                VStack(alignment: .leading, spacing: 10) {
-                    if nav.showSettings {
-                        SettingsView(
-                            onClose: { nav.showSettings = false },
-                            onChooseRepresentative: { nav.openRepresentativeDex() },
-                            startExpanded: nav.expandAdvancedOnOpen
-                        )
-                            .environment(store)
-                            .environment(companion)
-                            .environment(updater)
-                    } else {
-                        updateBanner
-                        tabContent
-                    }
+            Group {
+                if detached {
+                    detachedLayout(size: geo.size)
+                } else {
+                    attachedLayout(size: geo.size)
                 }
-                .padding(panelPad)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .background {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(nsColor: MenuBarPanelMetrics.canvasFill))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
-                }
-                .padding(.leading, leadingChrome)
-                .padding(.trailing, gap)
-                .padding(.bottom, gap)
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
             .background(Color(nsColor: MenuBarPanelMetrics.shellFill))
@@ -168,13 +233,150 @@ struct PopoverView: View {
                 style: .continuous))
             .ignoresSafeArea(.container, edges: detached ? .top : [])
             .environment(\.locale, companion.language.displayLocale)
-            .environment(\.popoverContentWidth, contentWidth)
+            .environment(\.menuBarSidebarLayout, detached)
         }
         .frame(
-            minWidth: MenuBarPanelMetrics.minWidth,
+            minWidth: MenuBarPanelMetrics.minContentWidth(
+                detached: detached,
+                sidebarCollapsed: store.menuBarSidebarCollapsed,
+                sidebarWidth: CGFloat(store.menuBarSidebarWidth)),
             maxWidth: detached ? MenuBarPanelMetrics.detachedMaxWidth : MenuBarPanelMetrics.attachedMaxWidth,
             minHeight: MenuBarPanelMetrics.minHeight(detached: detached),
             maxHeight: MenuBarPanelMetrics.maxHeight(detached: detached))
+    }
+
+    private func attachedLayout(size: CGSize) -> some View {
+        let gap = MenuBarPanelMetrics.shellGap
+        let panelPad = PopoverMetrics.padding
+        let contentWidth = max(0, size.width - gap * 2 - panelPad * 2)
+        return VStack(spacing: 0) {
+            PopoverShellToolbar()
+                .padding(.leading, gap)
+                .padding(.trailing, gap)
+                .padding(.top, 6)
+                .padding(.bottom, 4)
+            canvasStack
+                .padding(panelPad)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(nsColor: MenuBarPanelMetrics.canvasFill))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
+                }
+                .padding(.leading, gap)
+                .padding(.trailing, gap)
+                .padding(.bottom, gap)
+        }
+        .environment(\.popoverContentWidth, contentWidth)
+    }
+
+    private func detachedLayout(size: CGSize) -> some View {
+        let panelPad = PopoverMetrics.padding
+        let collapsed = store.menuBarSidebarCollapsed
+        let sidebarWidth = collapsed
+            ? MenuBarPanelMetrics.collapsedStripWidth
+            : MenuBarPanelMetrics.clampedSidebarWidth(CGFloat(store.menuBarSidebarWidth))
+        let splitter = collapsed ? 0 : MenuBarPanelMetrics.splitterWidth
+        let contentWidth = max(0, size.width - sidebarWidth - splitter - panelPad * 2)
+        return VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                sidebarColumn(width: sidebarWidth, collapsed: collapsed)
+                if !collapsed {
+                    ChromeColumnSplitter(
+                        collapsed: false,
+                        displayedWidth: sidebarWidth,
+                        growsWhenDraggedPositive: true,
+                        collapseLabel: l.collapseMenuBarSidebar,
+                        expandLabel: l.expandMenuBarSidebar,
+                        onToggle: { store.menuBarSidebarCollapsed = true },
+                        onDragTo: { store.menuBarSidebarWidth = Double(MenuBarPanelMetrics.clampedSidebarWidth($0)) }
+                    )
+                }
+                canvasStack
+                    .padding(panelPad)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .background(Color(nsColor: MenuBarPanelMetrics.canvasFill))
+            }
+            PopoverChromeActionButtons(spreadsAcrossBar: true)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(nsColor: MenuBarPanelMetrics.shellFill))
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(TahoeHairline.idle)
+                        .frame(height: TahoeHairline.width)
+                }
+        }
+        .environment(\.popoverContentWidth, contentWidth)
+    }
+
+    private func sidebarColumn(width: CGFloat, collapsed: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Color.clear
+                .frame(height: MenuBarPanelMetrics.sidebarTrafficLightClearance)
+            Button {
+                store.menuBarSidebarCollapsed.toggle()
+            } label: {
+                Image(systemName: collapsed ? "chevron.right" : "chevron.left")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Circle())
+                    .tahoeIconChrome()
+            }
+            .buttonStyle(.plain)
+            .help(collapsed ? l.expandMenuBarSidebar : l.collapseMenuBarSidebar)
+            .accessibilityLabel(collapsed ? l.expandMenuBarSidebar : l.collapseMenuBarSidebar)
+            if !collapsed {
+                MenuBarSidebarNav()
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
+        .frame(width: width, alignment: .topLeading)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color(nsColor: MenuBarPanelMetrics.shellFill))
+    }
+
+    @ViewBuilder
+    private var canvasStack: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if nav.showSettings {
+                if store.menuBarPanelDetached {
+                    HStack {
+                        Button {
+                            nav.goBack()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 28, height: 28)
+                                .contentShape(Circle())
+                                .tahoeIconChrome()
+                        }
+                        .buttonStyle(.plain)
+                        .help(l.goBack)
+                        .accessibilityLabel(l.goBack)
+                        Spacer()
+                    }
+                }
+                SettingsView(
+                    onClose: { nav.showSettings = false },
+                    onChooseRepresentative: { nav.openRepresentativeDex() },
+                    startExpanded: nav.expandAdvancedOnOpen
+                )
+                    .environment(store)
+                    .environment(companion)
+                    .environment(updater)
+            } else {
+                updateBanner
+                tabContent
+            }
+        }
     }
 
     @ViewBuilder

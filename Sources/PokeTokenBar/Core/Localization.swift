@@ -418,14 +418,17 @@ struct L {
     var linearIssuesTab: String { t("이슈", "Issues", "課題", "Issues", "Issues", "Issues", "Issues") }
     var linearProjectsTab: String { t("프로젝트", "Projects", "プロジェクト", "Proyectos", "Projets", "Projetos", "Projekte") }
     var linearInitiativesTab: String { t("이니셔티브", "Initiatives", "イニシアチブ", "Iniciativas", "Initiatives", "Iniciativas", "Initiativen") }
-    var linearInProgressTab: String { t("진행 중", "In progress", "進行中", "En curso", "En cours", "Em andamento", "In Arbeit") }
+    var linearInProgressTab: String { t("진행 중", "In Progress", "進行中", "En curso", "En cours", "Em andamento", "In Arbeit") }
     var linearProductionTab: String { t("프로덕션", "Production", "本番", "Producción", "Production", "Produção", "Produktion") }
     var linearActiveTab: String { t("활성", "Active", "アクティブ", "Activas", "Actives", "Ativas", "Aktiv") }
     var linearPlannedTab: String { t("예정", "Planned", "予定", "Planificadas", "Planifiées", "Planejadas", "Geplant") }
-    var linearCompletedTodayTab: String { t("오늘 완료", "Completed today", "今日完了", "Completadas hoy", "Terminées aujourd'hui", "Concluídas hoje", "Heute abgeschlossen") }
+    var linearCompletedTodayTab: String { t("오늘 완료", "Completed Today", "今日完了", "Completadas hoy", "Terminées aujourd'hui", "Concluídas hoje", "Heute abgeschlossen") }
+    var linearTodoTab: String { t("할 일", "Todo", "Todo", "Por hacer", "À faire", "A fazer", "Todo") }
     var linearIssuesNeedsSetup: String { t("설정에서 Linear API 키를 저장하고 통합을 켜면 표시됩니다.", "Save your Linear API key and enable Linear integration in Settings to view issues.", "設定でLinear APIキーを保存して連携を有効にすると表示されます。", "Guarda tu clave API de Linear y activa la integración en Ajustes para ver issues.", "Enregistre ta clé API Linear et active l’intégration dans Réglages pour afficher les issues.", "Salve sua chave API do Linear e ative a integração em Ajustes para ver issues.", "Speichere deinen Linear-API-Schlüssel und aktiviere die Integration in den Einstellungen, um Issues zu sehen.") }
     var linearIssuesEmptyCompleted: String { t("오늘 완료된 이슈가 없습니다.", "No issues completed today.", "本日完了した課題はありません。", "No hay issues completadas hoy.", "Aucune issue terminée aujourd'hui.", "Nenhuma issue concluída hoje.", "Heute keine abgeschlossenen Issues.") }
     var linearIssuesEmptyInProgress: String { t("현재 진행 중인 이슈가 없습니다.", "No issues currently in progress.", "現在進行中の課題はありません。", "No hay issues en curso.", "Aucune issue en cours actuellement.", "Nenhuma issue em andamento agora.", "Aktuell keine Issues in Arbeit.") }
+    var linearIssuesEmptyPlanned: String { t("예정된 이슈가 없습니다.", "No planned issues.", "予定の課題はありません。", "No hay issues planificadas.", "Aucune issue planifiée.", "Nenhuma issue planejada.", "Keine geplanten Issues.") }
+    var linearIssuesEmptyTodo: String { t("할 일 이슈가 없습니다.", "No todo issues.", "Todoの課題はありません。", "No hay issues por hacer.", "Aucune issue à faire.", "Nenhuma issue a fazer.", "Keine Todo-Issues.") }
     var linearProjectsEmpty: String { t("진행 중인 프로젝트가 없습니다.", "No in-progress projects.", "進行中のプロジェクトはありません。", "No hay proyectos en curso.", "Aucun projet en cours.", "Nenhum projeto em andamento.", "Keine Projekte in Arbeit.") }
     var linearProjectsEmptyProduction: String { t("프로덕션 프로젝트가 없습니다.", "No production projects.", "本番プロジェクトはありません。", "No hay proyectos en producción.", "Aucun projet en production.", "Nenhum projeto em produção.", "Keine Projekte in Produktion.") }
     var linearInitiativesEmpty: String { t("활성 이니셔티브가 없습니다.", "No active initiatives.", "アクティブなイニシアチブはありません。", "No hay iniciativas activas.", "Aucune initiative active.", "Nenhuma iniciativa ativa.", "Keine aktiven Initiativen.") }
@@ -514,6 +517,16 @@ struct L {
     var todayDeskLabelsLabel: String { t("레이블", "Labels", "ラベル", "Etiquetas", "Libellés", "Rótulos", "Labels") }
     var todayDeskEstimateLabel: String { t("추정", "Estimate", "見積", "Estimación", "Estimation", "Estimativa", "Schätzung") }
     var todayDeskDueLabel: String { t("기한", "Due", "期限", "Vencimiento", "Échéance", "Prazo", "Fällig") }
+    var collapseMenuBarSidebar: String {
+        t("사이드바 접기", "Collapse sidebar", "サイドバーを折りたたむ",
+          "Contraer barra lateral", "Replier la barre latérale",
+          "Recolher a barra lateral", "Seitenleiste einklappen")
+    }
+    var expandMenuBarSidebar: String {
+        t("사이드바 펼치기", "Expand sidebar", "サイドバーを展開",
+          "Expandir barra lateral", "Déplier la barre latérale",
+          "Expandir a barra lateral", "Seitenleiste ausklappen")
+    }
     var collapseLeftSidebar: String {
         t("왼쪽 사이드바 접기", "Collapse left sidebar", "左サイドバーを折りたたむ",
           "Contraer barra lateral izquierda", "Replier la barre latérale gauche",

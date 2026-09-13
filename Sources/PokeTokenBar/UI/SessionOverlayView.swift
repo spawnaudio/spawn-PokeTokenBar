@@ -10,9 +10,7 @@ struct SessionIslandView: View {
     private var l: L { companion.l }
 
     var body: some View {
-        if session.pomodoroSetupOpen, session.session == nil {
-            PomodoroSetupIsland()
-        } else if let current = session.session {
+        if let current = session.session {
             let issue = store.linearIssue(id: current.issue.id) ?? current.issue.summary
             let clock = session.clockDisplay()
             VStack(alignment: .leading, spacing: 6) {

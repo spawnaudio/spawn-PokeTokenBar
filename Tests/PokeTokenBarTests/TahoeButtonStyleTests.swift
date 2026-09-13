@@ -67,7 +67,7 @@ final class TahoeButtonStyleTests: XCTestCase {
         XCTAssertTrue(source.contains("enum TahoeHairline"))
         XCTAssertTrue(source.contains("func tahoeIconChrome"))
         XCTAssertTrue(source.contains("TahoeHairline.idle"))
-        XCTAssertTrue(source.contains("Color.primary.opacity(0.14)"))
+        XCTAssertTrue(source.contains("MenuBarPanelMetrics.selectedFill"))
         XCTAssertTrue(source.contains("selected ? TahoeHairline.selected : TahoeHairline.idle"))
         XCTAssertTrue(source.contains("detachMenuBarPanel") || source.contains("menuBarPanelDetached"))
         XCTAssertFalse(
@@ -135,12 +135,14 @@ final class TahoeButtonStyleTests: XCTestCase {
         let chrome = try String(
             contentsOf: root.appendingPathComponent("PopoverChrome.swift"), encoding: .utf8)
 
+        XCTAssertTrue(linear.contains("linearTodoTab"))
+        XCTAssertTrue(linear.contains("linearPlannedTab"))
         XCTAssertTrue(linear.contains("LinearIssueEntityRow"))
         XCTAssertTrue(linear.contains("LinearTagChip"))
         XCTAssertTrue(linear.contains("LinearMarkdownText"))
         XCTAssertTrue(linear.contains("LinearPriorityButton"))
-        XCTAssertTrue(linear.contains("static let initiative = \"flag\""))
-        XCTAssertFalse(linear.contains("flag.fill"))
+        XCTAssertTrue(chrome.contains("static let initiative = \"flag\""))
+        XCTAssertFalse(chrome.contains("flag.fill"))
         XCTAssertFalse(linear.contains("LinearPriorityTint.gold"))
         XCTAssertTrue(linear.contains("VStack(alignment: .leading, spacing: 0)"))
         XCTAssertFalse(linear.contains("popoverCard()"))

@@ -165,6 +165,13 @@ final class UsageStore {
     var menuBarPanelDetached: Bool {
         didSet { defaults.set(menuBarPanelDetached, forKey: MenuBarPanelMetrics.detachedKey) }
     }
+    /// Detached menu-bar sidebar preferred width (pt). Independent of window frame autosave.
+    var menuBarSidebarWidth: Double {
+        didSet { defaults.set(menuBarSidebarWidth, forKey: MenuBarPanelMetrics.sidebarWidthKey) }
+    }
+    var menuBarSidebarCollapsed: Bool {
+        didSet { defaults.set(menuBarSidebarCollapsed, forKey: MenuBarPanelMetrics.sidebarCollapsedKey) }
+    }
     /// Today desk left sidebar preferred width (pt). Independent of window frame autosave.
     var todayDeskLeftWidth: Double {
         didSet { defaults.set(todayDeskLeftWidth, forKey: TodayDeskLayout.leftWidthKey) }
@@ -650,6 +657,9 @@ final class UsageStore {
         floatingPetBubbleAlerts = d.object(forKey: "floatingPetBubbleAlerts") as? Bool ?? true
         floatingPetIslandFolded = d.object(forKey: "floatingPetIslandFolded") as? Bool ?? false
         menuBarPanelDetached = d.object(forKey: MenuBarPanelMetrics.detachedKey) as? Bool ?? false
+        menuBarSidebarWidth = d.object(forKey: MenuBarPanelMetrics.sidebarWidthKey) as? Double
+            ?? Double(MenuBarPanelMetrics.sidebarDefaultWidth)
+        menuBarSidebarCollapsed = d.object(forKey: MenuBarPanelMetrics.sidebarCollapsedKey) as? Bool ?? false
         let desk = TodayDeskLayout.load(from: d)
         todayDeskLeftWidth = Double(desk.leftWidth)
         todayDeskRightWidth = Double(desk.rightWidth)
@@ -970,6 +980,8 @@ final class UsageStore {
     private(set) var updatingLinearIssueID: String?
     private(set) var linearCompletedTodayIssues: [LinearIssueSummary] = []
     private(set) var linearInProgressIssues: [LinearIssueSummary] = []
+    private(set) var linearPlannedIssues: [LinearIssueSummary] = []
+    private(set) var linearTodoIssues: [LinearIssueSummary] = []
     private(set) var linearProjects: [LinearProjectSummary] = []
     private(set) var linearInitiatives: [LinearInitiativeSummary] = []
     private(set) var linearIssuesUpdatedAt: Date?
@@ -1173,6 +1185,8 @@ final class UsageStore {
 
     func linearIssue(id: String) -> LinearIssueSummary? {
         if let issue = linearInProgressIssues.first(where: { $0.id == id }) { return issue }
+        if let issue = linearPlannedIssues.first(where: { $0.id == id }) { return issue }
+        if let issue = linearTodoIssues.first(where: { $0.id == id }) { return issue }
         if let issue = linearCompletedTodayIssues.first(where: { $0.id == id }) { return issue }
         for project in linearProjects {
             if let issue = project.issues.first(where: { $0.id == id }) { return issue }
@@ -1255,6 +1269,8 @@ final class UsageStore {
             return calendar.isDate(completedAt, inSameDayAs: now)
         }
         linearInProgressIssues = dashboard.inProgress
+        linearPlannedIssues = dashboard.planned
+        linearTodoIssues = dashboard.todo
         linearProjects = dashboard.projects
         linearInitiatives = dashboard.initiatives
         linearIssuesUpdatedAt = Date()
@@ -1282,6 +1298,8 @@ final class UsageStore {
         }
 
         linearInProgressIssues = linearInProgressIssues.map(rewrite)
+        linearPlannedIssues = linearPlannedIssues.map(rewrite)
+        linearTodoIssues = linearTodoIssues.map(rewrite)
         linearCompletedTodayIssues = linearCompletedTodayIssues.map(rewrite)
         linearProjects = linearProjects.map { project in
             var copy = project
@@ -1299,6 +1317,8 @@ final class UsageStore {
         let isClosed = type == "completed" || type == "canceled"
 
         linearInProgressIssues.removeAll { $0.id == issueID }
+        linearPlannedIssues.removeAll { $0.id == issueID }
+        linearTodoIssues.removeAll { $0.id == issueID }
         linearCompletedTodayIssues.removeAll { $0.id == issueID }
         linearProjects = linearProjects.map { project in
             var copy = project
@@ -1311,9 +1331,18 @@ final class UsageStore {
             return copy
         }
 
-        if type == "started" {
-            linearInProgressIssues.append(issue)
-            linearInProgressIssues = LinearClient.sortedByPriority(linearInProgressIssues)
+        if let bucket = LinearClient.openIssueBucket(stateType: type, stateName: issue.stateName) {
+            switch bucket {
+            case .inProgress:
+                linearInProgressIssues.append(issue)
+                linearInProgressIssues = LinearClient.sortedByPriority(linearInProgressIssues)
+            case .planned:
+                linearPlannedIssues.append(issue)
+                linearPlannedIssues = LinearClient.sortedByPriority(linearPlannedIssues)
+            case .todo:
+                linearTodoIssues.append(issue)
+                linearTodoIssues = LinearClient.sortedByPriority(linearTodoIssues)
+            }
         }
         if type == "completed",
            let completedAt = issue.completedAt,
@@ -1332,6 +1361,8 @@ final class UsageStore {
             return copy
         }
         linearInProgressIssues = LinearClient.sortedByPriority(linearInProgressIssues.map(rewrite))
+        linearPlannedIssues = LinearClient.sortedByPriority(linearPlannedIssues.map(rewrite))
+        linearTodoIssues = LinearClient.sortedByPriority(linearTodoIssues.map(rewrite))
         linearCompletedTodayIssues = LinearClient.sortedByPriority(linearCompletedTodayIssues.map(rewrite))
         linearProjects = linearProjects.map { project in
             var copy = project
@@ -1349,6 +1380,8 @@ final class UsageStore {
         linearRecentCompletedIssues = []
         linearCompletedTodayIssues = []
         linearInProgressIssues = []
+        linearPlannedIssues = []
+        linearTodoIssues = []
         linearProjects = []
         linearInitiatives = []
         linearIssuesUpdatedAt = nil

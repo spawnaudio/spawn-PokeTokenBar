@@ -153,8 +153,16 @@ struct LinearInitiativeSummary: Equatable, Sendable, Identifiable {
 struct LinearIssueDashboard: Equatable, Sendable {
     var completedRecent: [LinearIssueSummary]
     var inProgress: [LinearIssueSummary]
+    var planned: [LinearIssueSummary] = []
+    var todo: [LinearIssueSummary] = []
     var projects: [LinearProjectSummary]
     var initiatives: [LinearInitiativeSummary]
+}
+
+enum LinearOpenIssueBucket: Equatable, Sendable {
+    case inProgress
+    case planned
+    case todo
 }
 
 protocol LinearHTTPClient: Sendable {
@@ -420,7 +428,10 @@ struct LinearClient: Sendable {
           ) {
             nodes { \(issueFields) }
           }
-          inProgress: issues(first: 100) {
+          inProgress: issues(
+            filter: { state: { type: { in: ["triage", "backlog", "unstarted", "started"] } } }
+            first: 100
+          ) {
             nodes { \(issueFields) }
           }
         }
@@ -630,17 +641,48 @@ struct LinearClient: Sendable {
         else { throw LinearAPIError.decoding }
 
         let completed = try completedNodes.map(parseIssueSummary)
-        let inProgress = try inProgressNodes
-            .map(parseIssueSummary)
-            .filter { $0.stateType?.lowercased() == "started" }
+        let open = try inProgressNodes.map(parseIssueSummary)
+        let partitioned = partitionOpenIssues(open)
         let projects = parseProjects(dataObj["projects"])
         let initiatives = parseInitiatives(dataObj["initiatives"])
         return hydrateTeamStates(
             LinearIssueDashboard(
                 completedRecent: sortedByPriority(completed),
-                inProgress: sortedByPriority(inProgress),
+                inProgress: partitioned.inProgress,
+                planned: partitioned.planned,
+                todo: partitioned.todo,
                 projects: keptProjects(projects),
                 initiatives: keptInitiatives(initiatives)))
+    }
+
+    static func openIssueBucket(stateType: String?, stateName: String?) -> LinearOpenIssueBucket? {
+        let type = (stateType ?? "").lowercased()
+        let name = (stateName ?? "").lowercased()
+        if type == "completed" || type == "canceled" { return nil }
+        if type == "started" { return .inProgress }
+        if name.contains("todo") { return .todo }
+        if name.contains("planned") || type == "backlog" || type == "triage" { return .planned }
+        if type == "unstarted" { return .todo }
+        return nil
+    }
+
+    static func partitionOpenIssues(_ issues: [LinearIssueSummary]) -> (
+        inProgress: [LinearIssueSummary],
+        planned: [LinearIssueSummary],
+        todo: [LinearIssueSummary]
+    ) {
+        var inProgress: [LinearIssueSummary] = []
+        var planned: [LinearIssueSummary] = []
+        var todo: [LinearIssueSummary] = []
+        for issue in issues {
+            switch openIssueBucket(stateType: issue.stateType, stateName: issue.stateName) {
+            case .inProgress: inProgress.append(issue)
+            case .planned: planned.append(issue)
+            case .todo: todo.append(issue)
+            case nil: break
+            }
+        }
+        return (sortedByPriority(inProgress), sortedByPriority(planned), sortedByPriority(todo))
     }
 
     private struct LinearContainerOverlay {
@@ -743,6 +785,8 @@ struct LinearClient: Sendable {
         }
         ingest(dashboard.completedRecent)
         ingest(dashboard.inProgress)
+        ingest(dashboard.planned)
+        ingest(dashboard.todo)
         for project in dashboard.projects { ingest(project.issues) }
         for initiative in dashboard.initiatives { ingest(initiative.issues) }
         return assigningTeamStates(dashboard, from: byTeam)
@@ -761,6 +805,8 @@ struct LinearClient: Sendable {
         }
         walk(dashboard.completedRecent)
         walk(dashboard.inProgress)
+        walk(dashboard.planned)
+        walk(dashboard.todo)
         for project in dashboard.projects { walk(project.issues) }
         for initiative in dashboard.initiatives { walk(initiative.issues) }
         return ids
@@ -792,6 +838,8 @@ struct LinearClient: Sendable {
         var copy = dashboard
         copy.completedRecent = fill(dashboard.completedRecent)
         copy.inProgress = fill(dashboard.inProgress)
+        copy.planned = fill(dashboard.planned)
+        copy.todo = fill(dashboard.todo)
         copy.projects = dashboard.projects.map { project in
             var next = project
             next.issues = fill(project.issues)

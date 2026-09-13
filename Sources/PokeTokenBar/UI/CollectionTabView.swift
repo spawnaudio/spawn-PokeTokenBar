@@ -5,17 +5,20 @@ import SwiftUI
 struct CollectionTabView: View {
     let store: CompanionStore
     let navigation: PopoverNavigation
+    @Environment(\.menuBarSidebarLayout) private var sidebarLayout
 
     private var l: L { store.l }
 
     var body: some View {
         @Bindable var nav = navigation
         VStack(alignment: .leading, spacing: 8) {
-            TahoeTabBar(selection: $nav.collectionSegment, items: [
-                TahoeTabItem(.bag, title: l.bag, symbol: "bag"),
-                TahoeTabItem(.dex, title: l.dexSegment, symbol: "square.grid.2x2"),
-                TahoeTabItem(.shop, title: l.shop, symbol: "cart"),
-            ])
+            if !sidebarLayout {
+                TahoeTabBar(selection: $nav.collectionSegment, items: [
+                    TahoeTabItem(.bag, title: l.bag, symbol: "bag"),
+                    TahoeTabItem(.dex, title: l.dexSegment, symbol: "square.grid.2x2"),
+                    TahoeTabItem(.shop, title: l.shop, symbol: "cart"),
+                ])
+            }
 
             Group {
                 switch nav.collectionSegment {

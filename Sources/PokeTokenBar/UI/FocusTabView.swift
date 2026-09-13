@@ -17,7 +17,9 @@ struct FocusTabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 promptStack
                 CompanionHeader(store: companion)
-                pomodoroSection
+                if let current = session.session, current.issue.isPomodoro {
+                    pomodoroClock(current)
+                }
                 linearSection
                 TodayUsageSummary(compact: true, showsRefresh: true) {
                     nav.tab = .usage
@@ -26,34 +28,6 @@ struct FocusTabView: View {
                 TimeXPView(store: store, companion: companion, compact: true)
                     .popoverCard()
             }
-        }
-    }
-
-    @ViewBuilder
-    private var pomodoroSection: some View {
-        if let current = session.session, current.issue.isPomodoro {
-            pomodoroClock(current)
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                PopoverSectionLabel(text: l.pomodoroTitle)
-                ViewThatFits(in: .horizontal) {
-                    Button(l.pomoTimer) { session.openPomodoroSetup() }
-                        .tahoeButtonStyle(.prominent)
-                        .controlSize(.regular)
-                        .fixedSize(horizontal: true, vertical: false)
-                    Button {
-                        session.openPomodoroSetup()
-                    } label: {
-                        Image(systemName: "timer")
-                    }
-                    .tahoeButtonStyle(.prominent)
-                    .controlSize(.regular)
-                    .help(l.pomoTimer)
-                    .accessibilityLabel(l.pomoTimer)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .popoverCard()
         }
     }
 

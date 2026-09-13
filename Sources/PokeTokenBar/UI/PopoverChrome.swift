@@ -20,8 +20,8 @@ struct PopoverMaterialBackground: NSViewRepresentable {
 /// Shared 0.5pt hairline so buttons, chips, tabs, and cards all read as bordered.
 enum TahoeHairline {
     static let width: CGFloat = 0.5
-    static let idle = Color.primary.opacity(0.14)
-    static let selected = Color.primary.opacity(0.18)
+    static let idle = Color(nsColor: MenuBarPanelMetrics.hairline)
+    static let selected = Color(nsColor: MenuBarPanelMetrics.hairlineSelected)
 
     static func tinted(_ color: Color) -> Color { color.opacity(0.45) }
 }
@@ -34,7 +34,7 @@ struct PopoverCardModifier: ViewModifier {
             .padding(12)
             .background {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.06))
+                    .fill(Color(nsColor: MenuBarPanelMetrics.cardFill))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -71,7 +71,7 @@ extension View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .frame(maxWidth: expands ? .infinity : nil, alignment: .leading)
-            .background((tint?.opacity(0.16) ?? Color.primary.opacity(0.06)), in: Capsule())
+            .background((tint?.opacity(0.16) ?? Color(nsColor: MenuBarPanelMetrics.chipFill)), in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
                     tint.map(TahoeHairline.tinted) ?? TahoeHairline.idle,
@@ -85,7 +85,7 @@ extension View {
             .buttonStyle(.plain)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(selected ? Color.primary.opacity(0.14) : Color.clear, in: Capsule())
+            .background(selected ? Color(nsColor: MenuBarPanelMetrics.selectedFill) : Color.clear, in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
                     selected ? TahoeHairline.selected : TahoeHairline.idle,
@@ -96,7 +96,7 @@ extension View {
     /// Toolbar strip: filled control surface + hairline.
     func popoverBottomBarChrome() -> some View {
         self
-            .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(Color(nsColor: MenuBarPanelMetrics.chipFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
@@ -112,7 +112,7 @@ extension View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.primary.opacity(0.16), in: Capsule())
+                .background(Color(nsColor: MenuBarPanelMetrics.selectedFill), in: Capsule())
                 .overlay {
                     Capsule().strokeBorder(TahoeHairline.selected, lineWidth: TahoeHairline.width)
                 }
@@ -133,21 +133,21 @@ extension View {
     func tahoeFloatingChrome(cornerRadius: CGFloat = 12) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
-            .background(Color.primary.opacity(0.08), in: shape)
+            .background(Color(nsColor: MenuBarPanelMetrics.cardFill), in: shape)
             .overlay { shape.strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width) }
     }
 
     func tahoePromptChrome(cornerRadius: CGFloat = 10) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
-            .background(Color.primary.opacity(0.08), in: shape)
+            .background(Color(nsColor: MenuBarPanelMetrics.cardFill), in: shape)
             .overlay { shape.strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width) }
     }
 
     func tahoeIconChrome(selected: Bool = false) -> some View {
         self
             .background(
-                selected ? Color.primary.opacity(0.14) : Color.clear,
+                selected ? Color(nsColor: MenuBarPanelMetrics.selectedFill) : Color.clear,
                 in: Circle())
             .overlay {
                 Circle().strokeBorder(
@@ -160,6 +160,13 @@ extension View {
 enum TahoeChromeSymbol {
     /// Trailing menu affordance on popup chips.
     static let menuChevron = "chevron.down"
+}
+
+/// Closest SF Symbols to Linear’s chrome (issue circle / project hexagon / initiative flag).
+enum LinearChromeSymbol {
+    static let issue = "circle"
+    static let project = "hexagon"
+    static let initiative = "flag"
 }
 
 /// Quiet popup label: current value plus a trailing chevron.
@@ -293,7 +300,7 @@ struct LinearTagChip: View {
             .lineLimit(1)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background((tint?.opacity(0.16) ?? Color.primary.opacity(0.06)), in: Capsule())
+            .background((tint?.opacity(0.16) ?? Color(nsColor: MenuBarPanelMetrics.chipFill)), in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
                     tint.map(TahoeHairline.tinted) ?? TahoeHairline.idle,
@@ -345,7 +352,7 @@ struct MutedProgressBar: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(Color(nsColor: MenuBarPanelMetrics.chipFill))
                     .overlay {
                         Capsule().strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
                     }
@@ -400,40 +407,18 @@ struct FocusMarkDoneButton: View {
 }
 
 @MainActor
-struct PopoverShellToolbar: View {
+struct PopoverChromeActionButtons: View {
     @Environment(PopoverNavigation.self) private var nav
     @Environment(FocusSessionStore.self) private var session
     @Environment(CompanionStore.self) private var companion
     @Environment(UsageStore.self) private var store
 
+    var spreadsAcrossBar: Bool = false
+
     private var l: L { companion.l }
 
     var body: some View {
-        @Bindable var nav = nav
         HStack(spacing: 8) {
-            if nav.canGoBack {
-                Button {
-                    nav.goBack()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Circle())
-                        .tahoeIconChrome()
-                }
-                .buttonStyle(.plain)
-                .help(l.goBack)
-                .accessibilityLabel(l.goBack)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                tabRow(showTitle: true)
-                    .fixedSize(horizontal: true, vertical: false)
-                tabRow(showTitle: false)
-            }
-            Spacer(minLength: 8)
-
             iconButton(
                 systemName: store.menuBarPanelDetached ? "menubar.arrow.up.rectangle" : "macwindow.on.rectangle",
                 help: store.menuBarPanelDetached ? l.attachMenuBarPanel : l.detachMenuBarPanel,
@@ -445,8 +430,9 @@ struct PopoverShellToolbar: View {
             iconButton(systemName: "calendar", help: l.todayDeskMenuOpen, label: l.todayDeskWindowTitle) {
                 session.openDesk()
             }
+            if spreadsAcrossBar { Spacer(minLength: 8) }
             iconButton(systemName: "gearshape", help: l.settings, label: l.settings, selected: nav.showSettings) {
-                nav.showSettings = true
+                nav.showSettings.toggle()
             }
         }
     }
@@ -468,6 +454,52 @@ struct PopoverShellToolbar: View {
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(label)
+    }
+}
+
+@MainActor
+struct PopoverShellToolbar: View {
+    @Environment(PopoverNavigation.self) private var nav
+    @Environment(CompanionStore.self) private var companion
+
+    var showsTabs: Bool = true
+    var showsActions: Bool = true
+    var showsBack: Bool = true
+
+    private var l: L { companion.l }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if showsBack, nav.canGoBack {
+                Button {
+                    nav.goBack()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Circle())
+                        .tahoeIconChrome()
+                }
+                .buttonStyle(.plain)
+                .help(l.goBack)
+                .accessibilityLabel(l.goBack)
+            }
+
+            if showsTabs {
+                ViewThatFits(in: .horizontal) {
+                    tabRow(showTitle: true)
+                        .fixedSize(horizontal: true, vertical: false)
+                    tabRow(showTitle: false)
+                }
+            }
+            if showsActions {
+                if showsTabs { Spacer(minLength: 8) }
+                PopoverChromeActionButtons()
+            } else {
+                Spacer(minLength: 0)
+            }
+        }
     }
 
     private func tabRow(showTitle: Bool) -> some View {
@@ -491,7 +523,7 @@ struct PopoverShellToolbar: View {
                     .padding(.horizontal, showTitle ? 10 : 8)
                     .padding(.vertical, 6)
                     .background(
-                        selected ? Color.primary.opacity(0.12) : Color.clear,
+                        selected ? Color(nsColor: MenuBarPanelMetrics.selectedFill) : Color.clear,
                         in: Capsule())
                     .overlay {
                         Capsule().strokeBorder(
@@ -505,5 +537,250 @@ struct PopoverShellToolbar: View {
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
+    }
+}
+
+/// Hairline column splitter + overlay-sized fold chevron. Drag resizes; chevron or
+/// double-click collapses. Collapsed sidebars keep this strip so they can expand.
+@MainActor
+struct ChromeColumnSplitter: View {
+    var collapsed: Bool
+    var displayedWidth: CGFloat
+    var growsWhenDraggedPositive: Bool
+    var collapseLabel: String
+    var expandLabel: String
+    var onToggle: () -> Void
+    var onDragTo: (CGFloat) -> Void
+
+    @State private var dragOrigin: CGFloat?
+    @State private var cursorPushed = false
+
+    private var chevronName: String {
+        if growsWhenDraggedPositive {
+            return collapsed ? "chevron.right" : "chevron.left"
+        }
+        return collapsed ? "chevron.left" : "chevron.right"
+    }
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(TahoeHairline.idle)
+                .frame(width: TahoeHairline.width)
+            Button(action: onToggle) {
+                Image(systemName: chevronName)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(
+                        width: TodayDeskMetrics.chevronHitSize,
+                        height: TodayDeskMetrics.chevronHitSize)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(collapsed ? expandLabel : collapseLabel)
+            .accessibilityLabel(collapsed ? expandLabel : collapseLabel)
+        }
+        .frame(width: TodayDeskMetrics.splitterWidth)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering {
+                NSCursor.resizeLeftRight.push()
+                cursorPushed = true
+            } else if cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
+        }
+        .onDisappear {
+            if cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
+        }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 2)
+                .onChanged { value in
+                    guard !collapsed else { return }
+                    if dragOrigin == nil { dragOrigin = displayedWidth }
+                    let delta = growsWhenDraggedPositive ? value.translation.width : -value.translation.width
+                    onDragTo((dragOrigin ?? displayedWidth) + delta)
+                }
+                .onEnded { _ in
+                    dragOrigin = nil
+                }
+        )
+        .onTapGesture(count: 2, perform: onToggle)
+    }
+}
+
+@MainActor
+struct MenuBarSidebarNav: View {
+    @Environment(PopoverNavigation.self) private var nav
+    @Environment(CompanionStore.self) private var companion
+
+    private var l: L { companion.l }
+
+    var body: some View {
+        ScrollView {
+            ViewThatFits(in: .horizontal) {
+                navColumn(showTitle: true)
+                    .fixedSize(horizontal: true, vertical: false)
+                navColumn(showTitle: false)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func navColumn(showTitle: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(PopoverTab.allCases, id: \.self) { tab in
+                sidebarRow(
+                    title: tab.title(l),
+                    symbol: tab.symbol,
+                    indent: 0,
+                    selected: !nav.showSettings && nav.tab == tab && !hasSelectedChild(tab),
+                    showTitle: showTitle
+                ) {
+                    nav.showSettings = false
+                    nav.tab = tab
+                }
+                if tab == .linear {
+                    linearChildren(showTitle: showTitle)
+                }
+                if tab == .collection {
+                    collectionChildren(showTitle: showTitle)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func linearChildren(showTitle: Bool) -> some View {
+        sidebarRow(
+            title: l.linearIssuesTab,
+            symbol: LinearChromeSymbol.issue,
+            indent: 1,
+            selected: false,
+            showTitle: showTitle
+        ) {
+            nav.showLinear(.issues)
+        }
+        ForEach(LinearIssuesTab.allCases, id: \.self) { tab in
+            sidebarRow(
+                title: tab.title(l),
+                symbol: tab.symbol,
+                indent: 2,
+                selected: nav.tab == .linear && nav.linearRoot == .issues
+                    && nav.linearIssuesTab == tab && !nav.showSettings,
+                showTitle: showTitle
+            ) {
+                nav.showLinear(.issues)
+                nav.linearIssuesTab = tab
+            }
+        }
+        sidebarRow(
+            title: l.linearProjectsTab,
+            symbol: LinearChromeSymbol.project,
+            indent: 1,
+            selected: false,
+            showTitle: showTitle
+        ) {
+            nav.showLinear(.projects)
+        }
+        ForEach(LinearProjectsTab.allCases, id: \.self) { tab in
+            sidebarRow(
+                title: tab.title(l),
+                symbol: tab.symbol,
+                indent: 2,
+                selected: nav.tab == .linear && nav.linearRoot == .projects
+                    && nav.linearProjectsTab == tab && !nav.showSettings,
+                showTitle: showTitle
+            ) {
+                nav.showLinear(.projects)
+                nav.linearProjectsTab = tab
+            }
+        }
+        sidebarRow(
+            title: l.linearInitiativesTab,
+            symbol: LinearChromeSymbol.initiative,
+            indent: 1,
+            selected: false,
+            showTitle: showTitle
+        ) {
+            nav.showLinear(.initiatives)
+        }
+        ForEach(LinearInitiativesTab.allCases, id: \.self) { tab in
+            sidebarRow(
+                title: tab.title(l),
+                symbol: tab.symbol,
+                indent: 2,
+                selected: nav.tab == .linear && nav.linearRoot == .initiatives
+                    && nav.linearInitiativesTab == tab && !nav.showSettings,
+                showTitle: showTitle
+            ) {
+                nav.showLinear(.initiatives)
+                nav.linearInitiativesTab = tab
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func collectionChildren(showTitle: Bool) -> some View {
+        ForEach(CollectionSegment.allCases, id: \.self) { segment in
+            sidebarRow(
+                title: segment.title(l),
+                symbol: segment.symbol,
+                indent: 1,
+                selected: nav.tab == .collection && nav.collectionSegment == segment && !nav.showSettings,
+                showTitle: showTitle
+            ) {
+                nav.showSettings = false
+                nav.showingCollectionLog = false
+                nav.collectionSegment = segment
+                nav.tab = .collection
+            }
+        }
+    }
+
+    private func hasSelectedChild(_ tab: PopoverTab) -> Bool {
+        switch tab {
+        case .linear, .collection: return !nav.showSettings && nav.tab == tab
+        case .focus, .usage: return false
+        }
+    }
+
+    private func sidebarRow(
+        title: String,
+        symbol: String,
+        indent: Int,
+        selected: Bool,
+        showTitle: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .frame(width: 14)
+                if showTitle {
+                    Text(title)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, CGFloat(indent) * 12)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                selected ? Color(nsColor: MenuBarPanelMetrics.selectedFill) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 13, weight: selected ? .medium : .regular))
+        .foregroundStyle(selected ? Color.primary : Color.secondary)
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

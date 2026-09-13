@@ -275,9 +275,6 @@ struct TodayDeskView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button(l.pomoTimer) { session.openPomodoroSetup() }
-                .tahoeButtonStyle(.prominent)
-                .controlSize(.regular)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .popoverCard()
