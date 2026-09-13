@@ -110,18 +110,18 @@ struct LinearIntegrationView: View {
             } else {
                 if selectedRoot == .issues {
                     TahoeTabBar(selection: $selectedIssuesTab, items: [
-                        TahoeTabItem(.inProgress, title: l.linearInProgressTab),
-                        TahoeTabItem(.completedToday, title: l.linearCompletedTodayTab),
+                        TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: "circle"),
+                        TahoeTabItem(.completedToday, title: l.linearCompletedTodayTab, symbol: "checkmark"),
                     ])
                 } else if selectedRoot == .projects {
                     TahoeTabBar(selection: $selectedProjectsTab, items: [
-                        TahoeTabItem(.inProgress, title: l.linearInProgressTab),
-                        TahoeTabItem(.production, title: l.linearProductionTab),
+                        TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: LinearChromeSymbol.project),
+                        TahoeTabItem(.production, title: l.linearProductionTab, symbol: "cube"),
                     ])
                 } else if selectedRoot == .initiatives {
                     TahoeTabBar(selection: $selectedInitiativesTab, items: [
-                        TahoeTabItem(.active, title: l.linearActiveTab),
-                        TahoeTabItem(.planned, title: l.linearPlannedTab),
+                        TahoeTabItem(.active, title: l.linearActiveTab, symbol: LinearChromeSymbol.initiative),
+                        TahoeTabItem(.planned, title: l.linearPlannedTab, symbol: "calendar"),
                     ])
                 }
 
@@ -162,7 +162,7 @@ struct LinearIntegrationView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 520, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .task(id: store.linearIntegrationEnabled && store.linearAPIKeyConfigured) {
             guard store.linearIntegrationEnabled, store.linearAPIKeyConfigured else { return }
             _ = await store.refreshLinearIssues()
@@ -241,81 +241,128 @@ struct LinearIntegrationView: View {
     }
 }
 
-/// Unboxed two-line issue row: status + bright title, muted ID, chips, trailing actions.
+/// Unboxed issue row. The highlighted row toggles fold; dedicated controls stay dedicated.
 @MainActor
 private struct LinearIssueEntityRow: View {
     let issue: LinearIssueSummary
     let onPin: () -> Void
 
-    @Environment(CompanionStore.self) private var companion
     @State private var hovering = false
+    @State private var expanded = false
 
-    private var l: L { companion.l }
+    private var rowShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                LinearStatusDot(type: issue.stateType)
-                Text(issue.title)
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    LinearStatusDot(type: issue.stateType)
+                    Text(issue.title)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(expanded ? nil : 2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .allowsHitTesting(false)
+
                 LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
             }
 
             HStack(alignment: .center, spacing: 4) {
-                chipRow
-                Spacer(minLength: 4)
+                foldedTeamLine
+                    .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+                    .allowsHitTesting(false)
+                LinearPriorityButton(issue: issue)
                 LinearIssueStatusPicker(issue: issue)
                 LinearFocusButton(issue: issue, openDeskOnPin: false, onPinned: onPin)
-                    .opacity(hovering ? 1 : 0.55)
+                    .opacity(hovering || expanded ? 1 : 0.55)
             }
 
-            if let text = issue.descriptionText, !text.isEmpty {
-                Text(text)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+            if !expanded {
+                foldedProjectLine
+                foldedLabelsLine
             }
 
-            LinearIssueCompletionStats(issue: issue)
+            if expanded {
+                LinearIssueMetadataList(issue: issue)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .allowsHitTesting(false)
+                if let text = issue.descriptionText, !text.isEmpty {
+                    LinearMarkdownText(source: text)
+                }
+                LinearIssueCompletionStats(issue: issue)
+                    .allowsHitTesting(false)
+            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
-        .background(Color.primary.opacity(hovering ? 0.06 : 0), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            Button {
+                withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() }
+            } label: {
+                rowShape
+                    .fill(Color.primary.opacity(hovering || expanded ? 0.06 : 0))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(rowShape)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(issue.title)
+            .accessibilityAddTraits(expanded ? .isSelected : [])
+        }
+        .contentShape(rowShape)
         .onHover { hovering = $0 }
+        .accessibilityAddTraits(expanded ? .isSelected : [])
     }
 
     @ViewBuilder
-    private var chipRow: some View {
-        let chips = metaChips
-        if !chips.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(chips, id: \.self) { LinearTagChip(text: $0) }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private var foldedTeamLine: some View {
+        let chips = foldedTeamChips
+        if !expanded, !chips.isEmpty {
+            chipRow(chips)
         }
     }
 
-    private var metaChips: [String] {
-        var chips: [String] = []
-        if issue.priority != nil {
-            chips.append(l.linearPriority(issue.priority))
+    @ViewBuilder
+    private var foldedProjectLine: some View {
+        if let project = issue.projectName, !project.isEmpty {
+            LinearTagChip(text: project, tint: nil)
+                .allowsHitTesting(false)
         }
-        if let key = issue.teamKey, !key.isEmpty { chips.append(key) }
-        if let project = issue.projectName, !project.isEmpty { chips.append(project) }
-        if let assignee = issue.assigneeName, !assignee.isEmpty { chips.append(assignee) }
-        if !issue.labelNames.isEmpty {
-            chips.append(issue.labelNames.prefix(3).joined(separator: ", "))
+    }
+
+    @ViewBuilder
+    private var foldedLabelsLine: some View {
+        let labels = Array(issue.labelNames.prefix(4))
+        if !labels.isEmpty {
+            chipRow(labels.map { (text: $0, tint: nil as Color?) })
+                .allowsHitTesting(false)
         }
-        if let estimate = issue.estimate { chips.append("E\(estimate)") }
+    }
+
+    private var foldedTeamChips: [(text: String, tint: Color?)] {
+        var chips: [(text: String, tint: Color?)] = []
+        if let key = issue.teamKey, !key.isEmpty {
+            chips.append((key, LinearTeamTint.color(forKey: key, name: issue.teamName)))
+        } else if let name = issue.teamName, !name.isEmpty {
+            chips.append((name, LinearTeamTint.color(forKey: nil, name: name)))
+        }
         if let due = issue.dueDate {
-            chips.append(due.formatted(.dateTime.month(.abbreviated).day()))
+            chips.append((due.formatted(.dateTime.month(.abbreviated).day()), nil))
         }
         return chips
+    }
+
+    @ViewBuilder
+    private func chipRow(_ chips: [(text: String, tint: Color?)]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                LinearTagChip(text: chip.text, tint: chip.tint)
+            }
+        }
     }
 }
 
@@ -326,8 +373,11 @@ private struct LinearContainerRow: Identifiable {
     var statusName: String?
     var leadOrOwner: String?
     var targetDate: Date?
+    var descriptionText: String?
     var symbol: String
     var issues: [LinearIssueSummary]
+
+    var symbolTint: Color { .secondary }
 
     init(project: LinearProjectSummary) {
         id = project.id
@@ -336,6 +386,7 @@ private struct LinearContainerRow: Identifiable {
         statusName = project.statusName ?? project.statusType
         leadOrOwner = project.leadName
         targetDate = project.targetDate
+        descriptionText = project.descriptionText
         symbol = LinearChromeSymbol.project
         issues = project.issues
     }
@@ -347,12 +398,13 @@ private struct LinearContainerRow: Identifiable {
         statusName = initiative.statusName
         leadOrOwner = initiative.ownerName
         targetDate = initiative.targetDate
+        descriptionText = initiative.descriptionText
         symbol = LinearChromeSymbol.initiative
         issues = initiative.issues
     }
 }
 
-/// Whole header row toggles fold; the open-in-Linear button does not.
+/// Unboxed two-line project/initiative row. Click unfolds metadata, markdown, and issues.
 @MainActor
 private struct LinearFoldableRow<Content: View>: View {
     let row: LinearContainerRow
@@ -363,12 +415,12 @@ private struct LinearFoldableRow<Content: View>: View {
     @State private var hoveringHeader = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 0) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() }
                 } label: {
-                    HStack(alignment: .center, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "chevron.right")
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.tertiary)
@@ -376,38 +428,19 @@ private struct LinearFoldableRow<Content: View>: View {
                             .frame(width: 10)
                         Image(systemName: row.symbol)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(row.symbolTint)
                             .frame(width: 12)
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(row.name)
-                                .font(.callout.weight(.semibold))
+                                .font(.callout.weight(.medium))
                                 .foregroundStyle(.primary)
-                            HStack(spacing: 6) {
-                                if let status = row.statusName {
-                                    Text(status)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                if let person = row.leadOrOwner, !person.isEmpty {
-                                    Text(person)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                if let target = row.targetDate {
-                                    Text(target.formatted(.dateTime.month(.abbreviated).day()))
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                }
-                                Text("\(row.issues.count)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if !expanded {
+                                collapsedMeta
                             }
                         }
-                        Spacer(minLength: 8)
                     }
-                    .padding(.vertical, 8)
-                    .padding(.leading, 4)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -423,15 +456,89 @@ private struct LinearFoldableRow<Content: View>: View {
                     .buttonStyle(.plain)
                     .controlSize(.mini)
                     .help(openHelp)
-                    .padding(.trailing, 8)
                 }
             }
-            .background(Color.primary.opacity(hoveringHeader ? 0.08 : 0.04))
-            .onHover { hoveringHeader = $0 }
 
             if expanded {
+                expandedMeta
+                if let text = row.descriptionText, !text.isEmpty {
+                    LinearMarkdownText(source: text)
+                }
                 content()
             }
         }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(
+            Color.primary.opacity(hoveringHeader || expanded ? 0.06 : 0),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { hoveringHeader = $0 }
+        .accessibilityAddTraits(expanded ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var collapsedMeta: some View {
+        let chips = metaChips
+        if !chips.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(Array(chips.enumerated()), id: \.offset) { _, text in
+                        LinearTagChip(text: text)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var expandedMeta: some View {
+        let chips = metaChips
+        if !chips.isEmpty {
+            FlexibleChipWrap(chips: chips)
+        }
+    }
+
+    private var metaChips: [String] {
+        var chips: [String] = []
+        if let status = row.statusName, !status.isEmpty { chips.append(status) }
+        if let person = row.leadOrOwner, !person.isEmpty { chips.append(person) }
+        if let target = row.targetDate {
+            chips.append(target.formatted(.dateTime.month(.abbreviated).day()))
+        }
+        chips.append("\(row.issues.count)")
+        return chips
+    }
+}
+
+@MainActor
+private struct FlexibleChipWrap: View {
+    let chips: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(chips.chunked(by: 3).enumerated()), id: \.offset) { _, row in
+                HStack(spacing: 4) {
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, text in
+                        LinearTagChip(text: text)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+}
+
+private extension Array {
+    func chunked(by size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        var rows: [[Element]] = []
+        var index = startIndex
+        while index < endIndex {
+            let next = self.index(index, offsetBy: size, limitedBy: endIndex) ?? endIndex
+            rows.append(Array(self[index..<next]))
+            index = next
+        }
+        return rows
     }
 }

@@ -160,6 +160,11 @@ final class UsageStore {
     var floatingPetIslandFolded: Bool {
         didSet { defaults.set(floatingPetIslandFolded, forKey: "floatingPetIslandFolded") }
     }
+    /// Menu-bar panel detached from the status item. Default attached (not draggable).
+    /// Only the in-panel button detaches or snaps it back — dragging does not.
+    var menuBarPanelDetached: Bool {
+        didSet { defaults.set(menuBarPanelDetached, forKey: MenuBarPanelMetrics.detachedKey) }
+    }
     /// Today desk left sidebar preferred width (pt). Independent of window frame autosave.
     var todayDeskLeftWidth: Double {
         didSet { defaults.set(todayDeskLeftWidth, forKey: TodayDeskLayout.leftWidthKey) }
@@ -644,6 +649,7 @@ final class UsageStore {
         floatingPetSize = d.object(forKey: "floatingPetSize") as? Double ?? 96
         floatingPetBubbleAlerts = d.object(forKey: "floatingPetBubbleAlerts") as? Bool ?? true
         floatingPetIslandFolded = d.object(forKey: "floatingPetIslandFolded") as? Bool ?? false
+        menuBarPanelDetached = d.object(forKey: MenuBarPanelMetrics.detachedKey) as? Bool ?? false
         let desk = TodayDeskLayout.load(from: d)
         todayDeskLeftWidth = Double(desk.leftWidth)
         todayDeskRightWidth = Double(desk.rightWidth)
@@ -1142,6 +1148,24 @@ final class UsageStore {
         }
     }
 
+    func updateLinearIssuePriority(_ issue: LinearIssueSummary, priority: Int) async {
+        guard linearIntegrationEnabled,
+              updatingLinearIssueID == nil,
+              let key = linearAPIKeys.load()?.key
+        else { return }
+
+        updatingLinearIssueID = issue.id
+        defer { updatingLinearIssueID = nil }
+
+        do {
+            try await linearClient.updateIssuePriority(
+                apiKey: key, issueID: issue.id, priority: priority)
+            applyOptimisticLinearPriorityChange(issueID: issue.id, priority: priority)
+        } catch {
+            linearIssuesError = "fetch_failed"
+        }
+    }
+
     /// Fetch + return completions when integration is on and a key is stored.
     func fetchLinearCompletionsForCompanion() async -> [LinearCompletedIssue] {
         await refreshLinearIssues()
@@ -1297,6 +1321,27 @@ final class UsageStore {
         {
             linearCompletedTodayIssues.append(issue)
             linearCompletedTodayIssues = LinearClient.sortedByPriority(linearCompletedTodayIssues)
+        }
+    }
+
+    private func applyOptimisticLinearPriorityChange(issueID: String, priority: Int) {
+        func rewrite(_ issue: LinearIssueSummary) -> LinearIssueSummary {
+            guard issue.id == issueID else { return issue }
+            var copy = issue
+            copy.priority = priority == 0 ? nil : priority
+            return copy
+        }
+        linearInProgressIssues = LinearClient.sortedByPriority(linearInProgressIssues.map(rewrite))
+        linearCompletedTodayIssues = LinearClient.sortedByPriority(linearCompletedTodayIssues.map(rewrite))
+        linearProjects = linearProjects.map { project in
+            var copy = project
+            copy.issues = LinearClient.sortedByPriority(project.issues.map(rewrite))
+            return copy
+        }
+        linearInitiatives = linearInitiatives.map { initiative in
+            var copy = initiative
+            copy.issues = LinearClient.sortedByPriority(initiative.issues.map(rewrite))
+            return copy
         }
     }
 

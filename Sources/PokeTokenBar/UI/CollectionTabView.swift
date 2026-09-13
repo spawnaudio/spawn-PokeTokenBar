@@ -12,9 +12,9 @@ struct CollectionTabView: View {
         @Bindable var nav = navigation
         VStack(alignment: .leading, spacing: 8) {
             TahoeTabBar(selection: $nav.collectionSegment, items: [
-                TahoeTabItem(.bag, title: l.bag),
-                TahoeTabItem(.dex, title: l.dexSegment),
-                TahoeTabItem(.shop, title: l.shop),
+                TahoeTabItem(.bag, title: l.bag, symbol: "bag"),
+                TahoeTabItem(.dex, title: l.dexSegment, symbol: "square.grid.2x2"),
+                TahoeTabItem(.shop, title: l.shop, symbol: "cart"),
             ])
 
             Group {
@@ -27,7 +27,7 @@ struct CollectionTabView: View {
                     ShopView(store: store, nav: navigation)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 520, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
 }

@@ -27,7 +27,7 @@ struct ShopView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 520, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func walletHeader(_ l: L) -> some View {

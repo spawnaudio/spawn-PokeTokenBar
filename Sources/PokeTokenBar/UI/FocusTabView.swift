@@ -13,17 +13,56 @@ struct FocusTabView: View {
     private var l: L { companion.l }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            promptStack
-            CompanionHeader(store: companion)
-            if let current = session.session {
-                pinnedIssue(current)
-            } else {
-                idlePrompt
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                promptStack
+                CompanionHeader(store: companion)
+                pomodoroSection
+                linearSection
+                TodayUsageSummary(compact: true, showsRefresh: true) {
+                    nav.tab = .usage
+                }
+                .popoverCard()
+                TimeXPView(store: store, companion: companion, compact: true)
+                    .popoverCard()
             }
-            TodayUsageSummary(compact: true) {
-                nav.tab = .usage
+        }
+    }
+
+    @ViewBuilder
+    private var pomodoroSection: some View {
+        if let current = session.session, current.issue.isPomodoro {
+            pomodoroClock(current)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                PopoverSectionLabel(text: l.pomodoroTitle)
+                ViewThatFits(in: .horizontal) {
+                    Button(l.pomoTimer) { session.openPomodoroSetup() }
+                        .tahoeButtonStyle(.prominent)
+                        .controlSize(.regular)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Button {
+                        session.openPomodoroSetup()
+                    } label: {
+                        Image(systemName: "timer")
+                    }
+                    .tahoeButtonStyle(.prominent)
+                    .controlSize(.regular)
+                    .help(l.pomoTimer)
+                    .accessibilityLabel(l.pomoTimer)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .popoverCard()
+        }
+    }
+
+    @ViewBuilder
+    private var linearSection: some View {
+        if let current = session.session, !current.issue.isPomodoro {
+            pinnedIssue(current)
+        } else {
+            idleLinearPrompt
         }
     }
 
@@ -87,23 +126,75 @@ struct FocusTabView: View {
                 .controlSize(.small)
             }
             LinearIssueStatusPicker(issue: issue, compact: false)
+            FocusTimerControls()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .popoverCard()
     }
 
-    private var idlePrompt: some View {
+    private func pomodoroClock(_ current: FocusSession) -> some View {
+        let clock = session.clockDisplay()
+        let paused = current.userPaused || current.phase == .paused
+        return VStack(alignment: .leading, spacing: 8) {
+            PopoverSectionLabel(text: l.pomodoroTitle)
+            HStack(alignment: .center, spacing: 10) {
+                Text(clock.text)
+                    .font(.system(size: 34, weight: .semibold, design: .rounded).monospacedDigit())
+                if clock.overtime {
+                    Text(l.overtimeAbbrev)
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
+                Spacer(minLength: 4)
+                FocusPauseButton(
+                    paused: paused,
+                    disabled: current.phase == .awaitingChoice,
+                    pauseTitle: l.pauseTimer,
+                    resumeTitle: l.resumeTimer
+                ) {
+                    session.togglePause()
+                }
+            }
+            FocusTimerControls()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .popoverCard()
+    }
+
+    private var idleLinearPrompt: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.focusIdlePrompt)
                 .font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
-                Button(l.openLinearTab) { nav.tab = .linear }
-                    .tahoeButtonStyle(.prominent)
-                Button(l.todayDeskMenuOpen) { session.openDesk() }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    Button(l.openLinearTab) { nav.tab = .linear }
+                        .tahoeButtonStyle(.regular)
+                    Button(l.todayDeskMenuOpen) { session.openDesk() }
+                        .tahoeButtonStyle(.regular)
+                }
+                .controlSize(.regular)
+                .fixedSize(horizontal: true, vertical: false)
+                HStack(spacing: 8) {
+                    Button { nav.tab = .linear } label: {
+                        Image(systemName: "circle")
+                    }
                     .tahoeButtonStyle(.regular)
+                    .help(l.openLinearTab)
+                    .accessibilityLabel(l.openLinearTab)
+                    Button { session.openDesk() } label: {
+                        Image(systemName: "calendar")
+                    }
+                    .tahoeButtonStyle(.regular)
+                    .help(l.todayDeskMenuOpen)
+                    .accessibilityLabel(l.todayDeskMenuOpen)
+                }
+                .controlSize(.regular)
             }
-            .controlSize(.regular)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .popoverCard()

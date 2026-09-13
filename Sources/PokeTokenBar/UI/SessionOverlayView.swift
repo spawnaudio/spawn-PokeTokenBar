@@ -10,7 +10,9 @@ struct SessionIslandView: View {
     private var l: L { companion.l }
 
     var body: some View {
-        if let current = session.session {
+        if session.pomodoroSetupOpen, session.session == nil {
+            PomodoroSetupIsland()
+        } else if let current = session.session {
             let issue = store.linearIssue(id: current.issue.id) ?? current.issue.summary
             let clock = session.clockDisplay()
             VStack(alignment: .leading, spacing: 6) {
@@ -28,14 +30,18 @@ struct SessionIslandView: View {
                 if !store.floatingPetIslandFolded {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
-                            LinearIssueIDButton(identifier: current.issue.identifier, url: current.issue.url)
+                            if !current.issue.isPomodoro {
+                                LinearIssueIDButton(identifier: current.issue.identifier, url: current.issue.url)
+                            }
                             Text(current.issue.title)
                                 .font(.caption)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                             Spacer(minLength: 0)
-                            NewLinearIssueButton()
-                            SessionNoteButton()
+                            if !current.issue.isPomodoro {
+                                NewLinearIssueButton()
+                                SessionNoteButton()
+                            }
                         }
                         HStack(spacing: 6) {
                             Text(clock.text)
@@ -60,10 +66,12 @@ struct SessionIslandView: View {
                             .buttonBorderShape(.circle)
                             .disabled(current.phase == .awaitingChoice)
                             .help(current.userPaused || current.phase == .paused ? l.resumeTimer : l.pauseTimer)
-                            LinearIssueStatusPicker(issue: issue)
+                            if !current.issue.isPomodoro {
+                                LinearIssueStatusPicker(issue: issue)
+                            }
                         }
                         FocusTimerControls()
-                        if session.isComposingNote {
+                        if session.isComposingNote, !current.issue.isPomodoro {
                             SessionNoteComposer()
                         }
                     }
@@ -78,6 +86,45 @@ struct SessionIslandView: View {
                 }
             }
         }
+    }
+}
+
+/// Duration chips + Start. Shown on the overlay before a no-issue timer begins.
+@MainActor
+struct PomodoroSetupIsland: View {
+    @Environment(FocusSessionStore.self) private var session
+    @Environment(CompanionStore.self) private var companion
+
+    private var l: L { companion.l }
+
+    var body: some View {
+        @Bindable var session = session
+        VStack(alignment: .leading, spacing: 8) {
+            Text(l.pomoTimer)
+                .font(.caption.weight(.semibold))
+            HStack(spacing: 4) {
+                ForEach(SessionXP.plannedPresets, id: \.self) { minutes in
+                    let selected = session.plannedMinutes == minutes
+                    Button(l.minutesValue(minutes)) {
+                        session.plannedMinutes = minutes
+                    }
+                    .font(.caption.weight(selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? Color.primary : Color.secondary)
+                    .linearSegmentChrome(selected: selected)
+                }
+            }
+            HStack(spacing: 6) {
+                Button(l.startPomodoro) { session.startPomodoro() }
+                    .tahoeButtonStyle(.prominent)
+                Button(l.cancel) { session.cancelPomodoroSetup() }
+                    .tahoeButtonStyle(.accessory)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .controlSize(.mini)
+        .padding(8)
+        .frame(width: FloatingPetController.islandWidth, alignment: .leading)
+        .tahoeFloatingChrome()
     }
 }
 

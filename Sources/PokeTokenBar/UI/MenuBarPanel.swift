@@ -6,35 +6,98 @@ extension LaunchWindowPolicy {
     static let menuBarPanelAutosaveName = "PokeTokenBarMenuBarPanel"
 }
 
-/// Sticky menu-bar window. Default is the current 360pt compact size; the user
-/// can stretch it toward Today, but not past 720pt (Today is 920×680).
+/// Sticky menu-bar window. Default is the current 360pt compact size; attached
+/// stretch stops at 500pt. Detached uses normal window min/max (no 500pt cap).
 enum MenuBarPanelMetrics {
     static let defaultWidth: CGFloat = PopoverMetrics.width
     static let defaultHeight: CGFloat = 640
     static let minWidth: CGFloat = PopoverMetrics.width
     static let minHeight: CGFloat = 520
-    static let maxWidth: CGFloat = 720
-    static let maxHeight: CGFloat = 660
+    static let attachedMaxWidth: CGFloat = 500
+    static let attachedMaxHeight: CGFloat = 660
+    static let detachedMinHeight: CGFloat = 400
+    static let detachedMaxWidth: CGFloat = 2400
+    static let detachedMaxHeight: CGFloat = 2400
+    static let maxWidth: CGFloat = detachedMaxWidth
+    static let maxHeight: CGFloat = attachedMaxHeight
     static let statusItemGap: CGFloat = 6
+    static let shellGap: CGFloat = 8
+    static let attachedCornerRadius: CGFloat = 12
+    /// Room for traffic lights on a unified hidden titlebar.
+    static let detachedTrafficLightInset: CGFloat = 76
+    static let detachedKey = "menuBarPanelDetached"
 
     static var defaultContentSize: NSSize {
         NSSize(width: defaultWidth, height: defaultHeight)
     }
 
+    static var attachedStyleMask: NSWindow.StyleMask { [.borderless, .resizable] }
+    static var detachedStyleMask: NSWindow.StyleMask {
+        [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+    }
+
+    static func maxWidth(detached: Bool) -> CGFloat {
+        detached ? detachedMaxWidth : attachedMaxWidth
+    }
+
+    static func minHeight(detached: Bool) -> CGFloat {
+        detached ? detachedMinHeight : minHeight
+    }
+
+    static func maxHeight(detached: Bool) -> CGFloat {
+        detached ? detachedMaxHeight : attachedMaxHeight
+    }
+
+    static var shellFill: NSColor { .controlBackgroundColor }
+    static var canvasFill: NSColor { .underPageBackgroundColor }
+
+    /// Dragging does not detach. Only the in-panel button does.
+    static func shouldPlaceBelowStatusItem(detached: Bool) -> Bool { !detached }
+
     @MainActor
-    static func configure(_ window: NSWindow) {
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+    static func configure(_ window: NSWindow, detached: Bool) {
+        window.styleMask = detached ? detachedStyleMask : attachedStyleMask
+        window.isMovable = detached
+        window.isMovableByWindowBackground = detached
+        window.hasShadow = true
         window.hidesOnDeactivate = false
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
-        window.contentMinSize = NSSize(width: minWidth, height: minHeight)
-        window.contentMaxSize = NSSize(width: maxWidth, height: maxHeight)
+        window.contentMinSize = NSSize(width: minWidth, height: minHeight(detached: detached))
+        window.contentMaxSize = NSSize(
+            width: maxWidth(detached: detached),
+            height: maxHeight(detached: detached))
+        window.setFrameAutosaveName(detached ? LaunchWindowPolicy.menuBarPanelAutosaveName : "")
+        window.titleVisibility = detached ? .hidden : .visible
+        window.titlebarAppearsTransparent = detached
+        window.titlebarSeparatorStyle = .none
+        window.toolbarStyle = .unifiedCompact
+        window.toolbar = nil
+        if detached {
+            window.isOpaque = true
+            window.backgroundColor = shellFill
+        } else {
+            window.isOpaque = false
+            window.backgroundColor = .clear
+        }
+        applyAttachedClip(window.contentView, detached: detached)
+        window.invalidateShadow()
     }
 
-    static func clampedContentSize(_ size: NSSize) -> NSSize {
+    @MainActor
+    static func applyAttachedClip(_ view: NSView?, detached: Bool) {
+        guard let view else { return }
+        view.wantsLayer = true
+        view.layer?.cornerRadius = detached ? 0 : attachedCornerRadius
+        view.layer?.cornerCurve = .continuous
+        view.layer?.masksToBounds = !detached
+        view.layer?.backgroundColor = detached ? nil : NSColor.clear.cgColor
+    }
+
+    static func clampedContentSize(_ size: NSSize, detached: Bool = true) -> NSSize {
         NSSize(
-            width: min(max(size.width, minWidth), maxWidth),
-            height: min(max(size.height, minHeight), maxHeight))
+            width: min(max(size.width, minWidth), maxWidth(detached: detached)),
+            height: min(max(size.height, minHeight(detached: detached)), maxHeight(detached: detached)))
     }
 
     /// Place `size` under the status item, clamped to `visibleScreen`.
@@ -66,6 +129,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     private let updater: UpdateChecker
     private let navigation: PopoverNavigation
     private var window: NSWindow?
+    private weak var statusButton: NSStatusBarButton?
     var onVisibilityChange: (() -> Void)?
 
     init(
@@ -81,6 +145,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         self.updater = updater
         self.navigation = navigation
         super.init()
+        observeDetach()
     }
 
     var isShown: Bool { window?.isVisible == true }
@@ -99,6 +164,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
 
     /// Pet / deep-link: show or bring forward. Does not close an already-open panel.
     func present(from button: NSStatusBarButton?, resetNavigation: Bool) {
+        if let button { statusButton = button }
         if window?.isMiniaturized == true || isShown {
             presentExisting()
             return
@@ -108,8 +174,9 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         if window == nil { window = makeWindow() }
         if window?.contentView == nil { window?.contentView = hostedView() }
         applyTitle()
+        applyChrome()
         clampContentSize()
-        if let button, shouldPlaceBelowStatusItem {
+        if let button, MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: usage.menuBarPanelDetached) {
             place(below: button)
         }
         window?.makeKeyAndOrderFront(nil)
@@ -117,7 +184,9 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     }
 
     func close() {
-        window?.performClose(nil)
+        window?.orderOut(nil)
+        window?.contentView = nil
+        onVisibilityChange?()
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -125,19 +194,29 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         onVisibilityChange?()
     }
 
-    private var shouldPlaceBelowStatusItem: Bool {
-        window?.frame.origin == .zero
+    func windowDidResize(_ notification: Notification) {
+        MenuBarPanelMetrics.applyAttachedClip(window?.contentView, detached: usage.menuBarPanelDetached)
+        window?.invalidateShadow()
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        clampContentSize()
+        window?.invalidateShadow()
     }
 
     private func presentExisting() {
         NSApp.activate(ignoringOtherApps: true)
         window?.deminiaturize(nil)
+        applyChrome()
+        if let statusButton, MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: usage.menuBarPanelDetached) {
+            place(below: statusButton)
+        }
         window?.makeKeyAndOrderFront(nil)
         onVisibilityChange?()
     }
 
     private func hostedView() -> NSView {
-        NSHostingView(rootView:
+        let view = NSHostingView(rootView:
             PopoverView()
                 .environment(usage)
                 .environment(companion)
@@ -146,19 +225,20 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
                 .environment(session)
                 .environment(\.locale, companion.language.displayLocale)
         )
+        MenuBarPanelMetrics.applyAttachedClip(view, detached: usage.menuBarPanelDetached)
+        return view
     }
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: MenuBarPanelMetrics.defaultContentSize),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: MenuBarPanelMetrics.attachedStyleMask,
             backing: .buffered,
             defer: false)
-        MenuBarPanelMetrics.configure(window)
         window.identifier = NSUserInterfaceItemIdentifier(LaunchWindowPolicy.menuBarPanelIdentifier)
-        window.setFrameAutosaveName(LaunchWindowPolicy.menuBarPanelAutosaveName)
         window.delegate = self
         window.contentView = hostedView()
+        MenuBarPanelMetrics.configure(window, detached: usage.menuBarPanelDetached)
         return window
     }
 
@@ -168,10 +248,35 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
             ?? "PokeTokenBar"
     }
 
+    private func applyChrome() {
+        guard let window else { return }
+        MenuBarPanelMetrics.configure(window, detached: usage.menuBarPanelDetached)
+        applyTitle()
+    }
+
+    private func observeDetach() {
+        withObservationTracking {
+            _ = usage.menuBarPanelDetached
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.applyChrome()
+                self.clampContentSize()
+                if let statusButton = self.statusButton,
+                   MenuBarPanelMetrics.shouldPlaceBelowStatusItem(detached: self.usage.menuBarPanelDetached)
+                {
+                    self.place(below: statusButton)
+                }
+                self.observeDetach()
+            }
+        }
+    }
+
     private func clampContentSize() {
         guard let window else { return }
         let current = window.contentRect(forFrameRect: window.frame).size
-        let clamped = MenuBarPanelMetrics.clampedContentSize(current)
+        let clamped = MenuBarPanelMetrics.clampedContentSize(
+            current, detached: usage.menuBarPanelDetached)
         if clamped != current {
             window.setContentSize(clamped)
         }

@@ -533,6 +533,109 @@ final class LinearRewardsTests: XCTestCase {
         XCTAssertFalse(bodyText.contains("CompleteLinearIssue"))
     }
 
+    func testUpdateIssuePriorityPostsPriorityMutation() async throws {
+        let fixture = """
+        {"data":{"issueUpdate":{"success":true,"issue":{"id":"issue-1","priority":1}}}}
+        """.data(using: .utf8)!
+        let http = StubLinearHTTPClient(status: 200, data: fixture)
+        let client = LinearClient(http: http)
+
+        try await client.updateIssuePriority(
+            apiKey: "lin_api_" + String(repeating: "x", count: 40),
+            issueID: "issue-1",
+            priority: LinearPriorityLevel.urgent.rawValue)
+
+        let sentBody = try XCTUnwrap(http.lastBody)
+        let bodyText = try XCTUnwrap(String(data: sentBody, encoding: .utf8))
+        XCTAssertTrue(bodyText.contains("issueUpdate"))
+        XCTAssertTrue(bodyText.contains("priority"))
+        XCTAssertTrue(bodyText.contains("issue-1"))
+        XCTAssertTrue(bodyText.contains("\"priority\":1") || bodyText.contains("priority\":1"))
+    }
+
+    func testParseIssuePriorityUpdateRejectsFailure() {
+        let json = #"{"data":{"issueUpdate":{"success":false}}}"#.data(using: .utf8)!
+        XCTAssertThrowsError(try LinearClient.parseIssuePriorityUpdate(json))
+    }
+
+    func testLinearMarkdownRendersEmphasisAndFallsBack() {
+        let rendered = LinearMarkdown.attributed("hello **world**")
+        XCTAssertEqual(String(rendered.characters), "hello world")
+        XCTAssertEqual(String(LinearMarkdown.attributed("plain").characters), "plain")
+        XCTAssertTrue(String(LinearMarkdown.attributed("   ").characters).isEmpty)
+    }
+
+    func testLinearMarkdownParsesHeadingsListsAndCheckboxes() {
+        let blocks = LinearMarkdown.blocks("""
+        # Title
+
+        hello **world**
+
+        - [ ] one
+        - [x] two
+        - three
+
+        > quoted
+        """)
+        XCTAssertEqual(blocks.count, 4)
+        guard case .heading(let level, let heading) = blocks[0] else {
+            return XCTFail("expected heading")
+        }
+        XCTAssertEqual(level, 1)
+        XCTAssertEqual(heading, "Title")
+        guard case .paragraph(let paragraph) = blocks[1] else {
+            return XCTFail("expected paragraph")
+        }
+        XCTAssertEqual(paragraph, "hello **world**")
+        guard case .list(let items, let ordered) = blocks[2] else {
+            return XCTFail("expected list")
+        }
+        XCTAssertFalse(ordered)
+        XCTAssertEqual(items.count, 3)
+        XCTAssertEqual(items[0].checked, false)
+        XCTAssertEqual(items[0].text, "one")
+        XCTAssertEqual(items[1].checked, true)
+        XCTAssertEqual(items[1].text, "two")
+        XCTAssertNil(items[2].checked)
+        XCTAssertEqual(items[2].text, "three")
+        guard case .quote(let quote) = blocks[3] else {
+            return XCTFail("expected quote")
+        }
+        XCTAssertEqual(quote, "quoted")
+    }
+
+    func testLinearMarkdownRewritesMentionsAndHtmlBreaks() {
+        let text = LinearMarkdown.preprocess("@[Ada](user:abc-123)<br>next")
+        XCTAssertTrue(text.contains("**@Ada**"))
+        XCTAssertTrue(text.contains("\nnext"))
+    }
+
+    func testLinearTeamTintMatchesWorkspaceKeysAndNames() {
+        XCTAssertEqual(LinearTeamTint.color(forKey: "SPA"), LinearTeamTint.spawnRed)
+        XCTAssertEqual(LinearTeamTint.color(forKey: "PER"), LinearTeamTint.squeakyAqua)
+        XCTAssertEqual(LinearTeamTint.color(forKey: "HOU"), LinearTeamTint.houseOrange)
+        XCTAssertEqual(LinearTeamTint.color(forKey: "STU"), LinearTeamTint.studyGreen)
+        XCTAssertEqual(
+            LinearTeamTint.color(forKey: nil, name: "[SPAWN] Audio"),
+            LinearTeamTint.spawnRed)
+        XCTAssertEqual(
+            LinearTeamTint.color(forKey: nil, name: "[SQUEAKY]"),
+            LinearTeamTint.squeakyAqua)
+        XCTAssertNil(LinearTeamTint.color(forKey: "ENG", name: "Engineering"))
+    }
+
+    func testLinearPriorityChipLabels() {
+        let l = L(.en)
+        XCTAssertEqual(l.linearPriorityChip(nil), "Priority")
+        XCTAssertEqual(l.linearPriorityChip(0), "Priority")
+        XCTAssertEqual(l.linearPriorityChip(4), "Low")
+        XCTAssertEqual(l.linearPriorityChip(3), "Medium")
+        XCTAssertEqual(l.linearPriorityChip(2), "High")
+        XCTAssertEqual(l.linearPriorityChip(1), "Urgent")
+        XCTAssertEqual(LinearPriorityLevel.from(1), .urgent)
+        XCTAssertEqual(LinearPriorityLevel.from(99), .none)
+    }
+
     func testCreateCommentPostsCommentCreateMutation() async throws {
         let fixture = """
         {"data":{"commentCreate":{"success":true,"comment":{"id":"comment-1"}}}}

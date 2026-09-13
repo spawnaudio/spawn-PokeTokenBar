@@ -40,6 +40,16 @@ struct L {
           "Wähle ein Linear-Issue zum Fokussieren")
     }
     var openLinearTab: String { t("Linear 열기", "Open Linear", "Linearを開く", "Abrir Linear", "Ouvrir Linear", "Abrir Linear", "Linear öffnen") }
+    var pomodoroTitle: String { t("포모도로", "Pomodoro", "ポモドーロ", "Pomodoro", "Pomodoro", "Pomodoro", "Pomodoro") }
+    var pomoTimer: String { t("포모 타이머", "Pomo Timer", "ポモタイマー", "Pomo Timer", "Pomo Timer", "Pomo Timer", "Pomo-Timer") }
+    var startPomodoro: String { t("시작", "Start", "開始", "Iniciar", "Démarrer", "Iniciar", "Start") }
+    var goBack: String { t("뒤로", "Back", "戻る", "Atrás", "Retour", "Voltar", "Zurück") }
+    var detachMenuBarPanel: String {
+        t("메뉴바에서 분리", "Detach from menu bar", "メニューバーから切り離す", "Separar de la barra de menús", "Détacher de la barre des menus", "Desanexar da barra de menus", "Von der Menüleiste lösen")
+    }
+    var attachMenuBarPanel: String {
+        t("메뉴바로 되돌리기", "Snap back to menu bar", "メニューバーに戻す", "Volver a la barra de menús", "Réattacher à la barre des menus", "Encaixar de volta na barra de menus", "An die Menüleiste andocken")
+    }
 
     var costUnavailable: String { t("계산 불가", "Unavailable", "計算不可", "No disponible", "Indisponible", "Indisponível", "Nicht verfügbar") }
     var costEstimateHint: String { t("모델 단가로 환산한 추정 비용입니다. 구독료나 실제 청구액이 아닙니다.", "Estimated from model token rates; not a subscription fee or invoice. Service-tier and other unlogged charges are excluded.", "モデル単価による推定です。購読料や実際の請求額ではありません。", "Estimación por tarifas del modelo; no es la cuota ni la factura real.", "Estimation selon les tarifs du modèle, pas un abonnement ni une facture.", "Estimativa pelas tarifas do modelo; não é assinatura nem fatura.", "Schätzung anhand der Modellpreise, keine Abogebühr oder Rechnung.") }
@@ -461,13 +471,16 @@ struct L {
           "\(count) erledigt")
     }
     func linearPriority(_ value: Int?) -> String {
-        guard let value else { return t("우선순위 없음", "No priority", "優先度なし", "Sin prioridad", "Sans priorité", "Sem prioridade", "Keine Priorität") }
-        switch value {
-        case 1: return t("P1 긴급", "P1 Urgent", "P1 緊急", "P1 Urgente", "P1 Urgent", "P1 Urgente", "P1 Dringend")
-        case 2: return t("P2 높음", "P2 High", "P2 高", "P2 Alta", "P2 Haute", "P2 Alta", "P2 Hoch")
-        case 3: return t("P3 보통", "P3 Medium", "P3 中", "P3 Media", "P3 Moyenne", "P3 Média", "P3 Mittel")
-        case 4: return t("P4 낮음", "P4 Low", "P4 低", "P4 Baja", "P4 Basse", "P4 Baixa", "P4 Niedrig")
-        default: return "P\(value)"
+        linearPriorityChip(value)
+    }
+    /// Compact chip labels (Linear: Priority / Urgent / High / Medium / Low).
+    func linearPriorityChip(_ value: Int?) -> String {
+        switch LinearPriorityLevel.from(value) {
+        case .none: return t("우선순위", "Priority", "優先度", "Prioridad", "Priorité", "Prioridade", "Priorität")
+        case .urgent: return t("긴급", "Urgent", "緊急", "Urgente", "Urgent", "Urgente", "Dringend")
+        case .high: return t("높음", "High", "高", "Alta", "Haute", "Alta", "Hoch")
+        case .medium: return t("보통", "Medium", "中", "Media", "Moyenne", "Média", "Mittel")
+        case .low: return t("낮음", "Low", "低", "Baja", "Basse", "Baixa", "Niedrig")
         }
     }
     var timeXPTitle: String { t("시간 XP", "Time XP", "時間XP", "XP tiempo", "XP temps", "XP tempo", "Zeit-XP") }

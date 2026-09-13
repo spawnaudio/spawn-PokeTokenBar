@@ -268,17 +268,20 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(store.floatingPetSize, 96)
         XCTAssertTrue(store.floatingPetBubbleAlerts, "bubble alerts default on when pet is later enabled")
         XCTAssertFalse(store.floatingPetIslandFolded, "timer island default expanded")
+        XCTAssertFalse(store.menuBarPanelDetached, "menu-bar panel default attached")
 
         store.floatingPetEnabled = true
         store.floatingPetSize = 144
         store.floatingPetBubbleAlerts = false
         store.floatingPetIslandFolded = true
+        store.menuBarPanelDetached = true
 
         let reloaded = makeStore(providers: [claude])   // 같은 suite 재로딩 = 앱 재시작
         XCTAssertTrue(reloaded.floatingPetEnabled)
         XCTAssertEqual(reloaded.floatingPetSize, 144)
         XCTAssertFalse(reloaded.floatingPetBubbleAlerts)
         XCTAssertTrue(reloaded.floatingPetIslandFolded)
+        XCTAssertTrue(reloaded.menuBarPanelDetached)
     }
 
     func testTodayDeskSidebarLayoutDefaultAndPersistence() {

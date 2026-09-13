@@ -560,6 +560,22 @@ final class FocusSessionTests: XCTestCase {
         XCTAssertGreaterThan(foldedForfeit.height, folded.height)
     }
 
+    func testTimerToggleReservesAButtonWithoutASession() {
+        let pet: CGFloat = 48
+        let idle = FloatingPetController.panelSize(
+            petSize: pet, showingBubble: false, hasIsland: false, prompt: .none)
+        XCTAssertEqual(idle, NSSize(width: pet, height: pet))
+
+        let withToggle = FloatingPetController.panelSize(
+            petSize: pet, showingBubble: false, hasIsland: false, prompt: .none,
+            showsTimerToggle: true)
+        XCTAssertEqual(withToggle.height, pet)
+        XCTAssertEqual(
+            withToggle.width,
+            pet + FloatingPetController.islandFoldChevronSize + FloatingPetController.islandGap)
+        XCTAssertGreaterThanOrEqual(FloatingPetController.islandFoldChevronSize, 28)
+    }
+
     func testOverlayNeedsKeyWindowOnlyForTextFields() {
         XCTAssertFalse(FloatingPetController.overlayNeedsKeyWindow(composingNote: false, prompt: .none))
         XCTAssertFalse(FloatingPetController.overlayNeedsKeyWindow(composingNote: false, prompt: .zeroTime))
@@ -1046,6 +1062,92 @@ final class FocusSessionTests: XCTestCase {
         stores.focus.pin(issue())
         XCTAssertTrue(deskOpened)
         XCTAssertEqual(stores.focus.session?.issue.id, "issue-1")
+    }
+
+    func testStartPomodoroWithoutLinearIssue() {
+        let stores = makeStores()
+        stores.focus.startPomodoro()
+        XCTAssertEqual(stores.focus.session?.issue.id, FocusPinnedIssue.pomodoroID)
+        XCTAssertEqual(stores.focus.session?.issue.identifier, "POMO")
+        XCTAssertTrue(stores.focus.session?.issue.isPomodoro == true)
+        XCTAssertNil(stores.focus.session?.issue.url)
+        XCTAssertEqual(stores.focus.session?.issue.title, stores.companion.l.pomodoroTitle)
+    }
+
+    func testOpenPomodoroSetupDoesNotStartUntilConfirmed() {
+        let stores = makeStores()
+        var revealed = false
+        stores.focus.onRevealOverlay = { revealed = true }
+        stores.focus.openPomodoroSetup()
+        XCTAssertTrue(stores.focus.pomodoroSetupOpen)
+        XCTAssertNil(stores.focus.session)
+        XCTAssertTrue(revealed)
+
+        stores.focus.cancelPomodoroSetup()
+        XCTAssertFalse(stores.focus.pomodoroSetupOpen)
+        XCTAssertNil(stores.focus.session)
+
+        stores.focus.openPomodoroSetup()
+        stores.focus.startPomodoro()
+        XCTAssertFalse(stores.focus.pomodoroSetupOpen)
+        XCTAssertEqual(stores.focus.session?.issue.id, FocusPinnedIssue.pomodoroID)
+    }
+
+    func testOpenPomodoroSetupIsNoOpDuringASession() {
+        let stores = makeStores()
+        stores.focus.pin(issue(), openDesk: false)
+        stores.focus.openPomodoroSetup()
+        XCTAssertFalse(stores.focus.pomodoroSetupOpen)
+        XCTAssertEqual(stores.focus.session?.issue.id, "issue-1")
+    }
+
+    func testPinningClearsPomodoroSetup() {
+        let stores = makeStores()
+        stores.focus.openPomodoroSetup()
+        XCTAssertTrue(stores.focus.pomodoroSetupOpen)
+        stores.focus.pin(issue(), openDesk: false)
+        XCTAssertFalse(stores.focus.pomodoroSetupOpen)
+        XCTAssertEqual(stores.focus.session?.issue.id, "issue-1")
+    }
+
+    func testSetupIslandGrowsIdleOverlay() {
+        let pet: CGFloat = 48
+        let toggle = FloatingPetController.panelSize(
+            petSize: pet, showingBubble: false, hasIsland: false, prompt: .none,
+            showsTimerToggle: true)
+        let setup = FloatingPetController.panelSize(
+            petSize: pet, showingBubble: false, hasIsland: false, prompt: .none,
+            showsTimerToggle: true, setupIsland: true)
+        XCTAssertGreaterThan(setup.height, toggle.height)
+        XCTAssertEqual(setup.height, FloatingPetController.setupIslandHeight)
+        XCTAssertGreaterThan(setup.width, toggle.width)
+    }
+
+    func testStartPomodoroIsNoOpWhenASessionExists() {
+        let stores = makeStores()
+        stores.focus.pin(issue(), openDesk: false)
+        stores.focus.startPomodoro()
+        XCTAssertEqual(stores.focus.session?.issue.id, "issue-1")
+        XCTAssertFalse(stores.focus.session?.issue.isPomodoro == true)
+    }
+
+    func testPomodoroPersistsAndPinningLinearUsesForfeit() async {
+        let stores = makeStores()
+        stores.focus.startPomodoro()
+        let reloaded = FocusSessionStore(
+            usage: stores.usage,
+            companion: stores.companion,
+            clock: { self.t0 },
+            fileURL: stores.focusURL,
+            ticksOnTimer: false)
+        XCTAssertTrue(reloaded.session?.issue.isPomodoro == true)
+
+        stores.focus.pin(issue(), openDesk: false)
+        XCTAssertEqual(stores.focus.session?.issue.id, FocusPinnedIssue.pomodoroID)
+        XCTAssertNotNil(stores.focus.forfeitPrompt)
+        await stores.focus.confirmForfeit()
+        XCTAssertEqual(stores.focus.session?.issue.id, "issue-1")
+        XCTAssertFalse(stores.focus.session?.issue.isPomodoro == true)
     }
 
     private func makeStores(

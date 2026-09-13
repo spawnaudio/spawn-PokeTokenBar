@@ -40,11 +40,14 @@ final class FocusSessionStore {
         }
     }
     var checkInDraft = ""
-    var onOpenDesk: (() -> Void)?
-    var onOpenComposer: (() -> Void)?
-    private var isLoading = false
     private(set) var forfeitPrompt: FocusForfeitWarning?
     private(set) var resetPrompt = false
+    /// Overlay setup island for a timer with no Linear issue. Not persisted.
+    private(set) var pomodoroSetupOpen = false
+    var onOpenDesk: (() -> Void)?
+    var onOpenComposer: (() -> Void)?
+    var onRevealOverlay: (() -> Void)?
+    private var isLoading = false
     private var pendingAfterForfeit: PendingAfterForfeit = .none
     private let createIssue: ((LinearIssueDraft) async -> LinearIssueSummary?)?
 
@@ -114,6 +117,7 @@ final class FocusSessionStore {
     }
 
     func pin(_ issue: LinearIssueSummary, openDesk: Bool = true) {
+        pomodoroSetupOpen = false
         if let current = session, current.issue.id == issue.id {
             if openDesk { self.openDesk() }
             return
@@ -124,6 +128,24 @@ final class FocusSessionStore {
         }
         start(issue)
         if openDesk { self.openDesk() }
+    }
+
+    /// Show duration options on the floating overlay. Does not start the clock.
+    func openPomodoroSetup() {
+        guard session == nil else { return }
+        pomodoroSetupOpen = true
+        onRevealOverlay?()
+    }
+
+    func cancelPomodoroSetup() {
+        pomodoroSetupOpen = false
+    }
+
+    /// Start the overlay/Focus clock without a Linear issue. No-op if a session is already running.
+    func startPomodoro() {
+        guard session == nil else { return }
+        pomodoroSetupOpen = false
+        startPinned(FocusPinnedIssue.pomodoro(title: companion.l.pomodoroTitle))
     }
 
     func requestUnfocus() {
@@ -386,6 +408,7 @@ final class FocusSessionStore {
     }
 
     private func postLinearComment(issueID: String, body: String) async -> Bool {
+        if session?.issue.isPomodoro == true { return false }
         if let postComment {
             return await postComment(issueID, body)
         }
@@ -400,6 +423,10 @@ final class FocusSessionStore {
     }
 
     private func start(_ issue: LinearIssueSummary) {
+        startPinned(FocusPinnedIssue(issue))
+    }
+
+    private func startPinned(_ issue: FocusPinnedIssue) {
         let now = clock()
         companion.setTimeOpenXPSuspended(true)
         sessionGrantedXP = 0
@@ -409,7 +436,7 @@ final class FocusSessionStore {
         isComposingNote = false
         notePostFailed = false
         session = FocusSession.start(
-            issue: FocusPinnedIssue(issue),
+            issue: issue,
             plannedMinutes: plannedMinutes,
             checkInMinutes: checkInMinutes,
             now: now)
@@ -428,6 +455,7 @@ final class FocusSessionStore {
         sessionNotes = []
         forfeitPrompt = nil
         resetPrompt = false
+        pomodoroSetupOpen = false
         pendingAfterForfeit = .none
         if resumeTimeOpen {
             companion.setTimeOpenXPSuspended(false, resumeFromNow: true)
