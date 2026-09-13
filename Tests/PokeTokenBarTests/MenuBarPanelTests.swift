@@ -6,10 +6,11 @@ final class MenuBarPanelTests: XCTestCase {
     func testDefaultIsCompactAndMaxStaysBelowToday() {
         XCTAssertEqual(MenuBarPanelMetrics.minWidth, 360)
         XCTAssertEqual(MenuBarPanelMetrics.defaultWidth, 360)
-        XCTAssertEqual(MenuBarPanelMetrics.maxWidth, 720)
-        XCTAssertLessThan(MenuBarPanelMetrics.maxWidth, TodayDeskMetrics.defaultWidth)
-        XCTAssertLessThan(MenuBarPanelMetrics.maxHeight, TodayDeskMetrics.defaultHeight)
+        XCTAssertEqual(MenuBarPanelMetrics.attachedMaxWidth, 500)
+        XCTAssertLessThan(MenuBarPanelMetrics.attachedMaxWidth, TodayDeskMetrics.defaultWidth)
+        XCTAssertLessThan(MenuBarPanelMetrics.attachedMaxHeight, TodayDeskMetrics.defaultHeight)
         XCTAssertGreaterThanOrEqual(MenuBarPanelMetrics.minHeight, 520)
+        XCTAssertGreaterThan(MenuBarPanelMetrics.detachedMaxWidth, MenuBarPanelMetrics.attachedMaxWidth)
     }
 
     func testIdentifiersAreNotSettingsPlaceholders() {
@@ -36,7 +37,9 @@ final class MenuBarPanelTests: XCTestCase {
         XCTAssertTrue(window.styleMask.contains(.resizable))
         XCTAssertEqual(window.contentMinSize.width, 360)
         XCTAssertEqual(window.contentMaxSize.width, 500)
-        XCTAssertEqual(window.backgroundColor, NSColor.underPageBackgroundColor)
+        XCTAssertFalse(window.isOpaque)
+        XCTAssertEqual(window.backgroundColor, NSColor.clear)
+        XCTAssertEqual(window.contentView?.layer?.cornerRadius, 12)
     }
 
     @MainActor
@@ -51,6 +54,10 @@ final class MenuBarPanelTests: XCTestCase {
         XCTAssertTrue(window.styleMask.contains(.titled))
         XCTAssertTrue(window.styleMask.contains(.closable))
         XCTAssertTrue(window.styleMask.contains(.resizable))
+        XCTAssertTrue(window.styleMask.contains(.fullSizeContentView))
+        XCTAssertTrue(window.titlebarAppearsTransparent)
+        XCTAssertEqual(window.titleVisibility, .hidden)
+        XCTAssertGreaterThan(window.contentMaxSize.width, MenuBarPanelMetrics.attachedMaxWidth)
     }
 
     func testOnlyTheButtonDetachesFromTheMenuBar() {
@@ -60,19 +67,22 @@ final class MenuBarPanelTests: XCTestCase {
 
     func testClampedContentSizePinsToMinAndMax() {
         XCTAssertEqual(
-            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 200, height: 100)),
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 200, height: 100), detached: false),
             NSSize(width: 360, height: 520))
         XCTAssertEqual(
-            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 900, height: 900)),
-            NSSize(width: 720, height: 660))
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 200, height: 100), detached: true),
+            NSSize(width: 360, height: 400))
         XCTAssertEqual(
-            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 500, height: 600)),
-            NSSize(width: 500, height: 600))
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 900, height: 900), detached: false),
+            NSSize(width: 500, height: 660))
         XCTAssertEqual(
-            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 900, height: 600), detached: false),
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 900, height: 900), detached: true),
+            NSSize(width: 900, height: 900))
+        XCTAssertEqual(
+            MenuBarPanelMetrics.clampedContentSize(NSSize(width: 500, height: 600), detached: false),
             NSSize(width: 500, height: 600))
         XCTAssertEqual(MenuBarPanelMetrics.maxWidth(detached: false), 500)
-        XCTAssertEqual(MenuBarPanelMetrics.maxWidth(detached: true), 720)
+        XCTAssertEqual(MenuBarPanelMetrics.maxWidth(detached: true), 2400)
     }
 
     func testFrameBelowStatusItemCentersAndClampsToScreen() {
@@ -129,10 +139,30 @@ final class MenuBarPanelTests: XCTestCase {
         let chrome = try String(
             contentsOf: root.appendingPathComponent("PopoverChrome.swift"), encoding: .utf8)
         XCTAssertTrue(popover.contains("PopoverShellToolbar"))
-        XCTAssertTrue(popover.contains("underPageBackgroundColor"))
-        XCTAssertTrue(popover.contains("controlBackgroundColor"))
+        XCTAssertTrue(popover.contains("canvasFill"))
+        XCTAssertTrue(popover.contains("shellFill"))
+        XCTAssertTrue(popover.contains("attachedCornerRadius"))
         XCTAssertTrue(popover.contains("shellGap"))
         XCTAssertTrue(chrome.contains("struct PopoverShellToolbar"))
         XCTAssertTrue(chrome.contains("chevron.left"))
+        XCTAssertTrue(chrome.contains("ViewThatFits"))
+        XCTAssertTrue(popover.contains("ignoresSafeArea"))
+    }
+
+    func testFocusTabKeepsPomodoroUsageAndTimeXPSeparate() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokeTokenBar/UI")
+        let focus = try String(contentsOf: root.appendingPathComponent("FocusTabView.swift"), encoding: .utf8)
+        XCTAssertTrue(focus.contains("pomodoroSection"))
+        XCTAssertTrue(focus.contains("linearSection"))
+        XCTAssertTrue(focus.contains("showsRefresh: true"))
+        XCTAssertTrue(focus.contains("TimeXPView"))
+        XCTAssertTrue(focus.contains("session.openPomodoroSetup()"))
+        XCTAssertTrue(focus.contains("l.pomoTimer"))
+        XCTAssertTrue(focus.contains("CompanionHeader(store: companion)"))
+        XCTAssertTrue(focus.contains(".popoverCard()"))
     }
 }

@@ -7,14 +7,44 @@ struct TodayUsageSummary: View {
     @Environment(UsageStore.self) private var store
     @Environment(CompanionStore.self) private var companion
     var compact: Bool = false
+    var showsRefresh: Bool = false
     var onTap: (() -> Void)? = nil
 
     private var l: L { companion.l }
     private var weekTokens: Int { store.weekTotalTokens }
 
     var body: some View {
-        let content = VStack(alignment: .leading, spacing: compact ? 8 : 6) {
-            PopoverSectionLabel(text: l.todayUsageSection)
+        VStack(alignment: .leading, spacing: compact ? 8 : 6) {
+            HStack {
+                PopoverSectionLabel(text: l.todayUsageSection)
+                Spacer()
+                if showsRefresh {
+                    Button {
+                        Task { await store.refresh() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .tahoeButtonStyle(.accessory)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.small)
+                    .help(l.refreshNow)
+                    .accessibilityLabel(l.refreshNow)
+                }
+            }
+            Group {
+                if let onTap {
+                    Button(action: onTap) { totals }
+                        .buttonStyle(.plain)
+                } else {
+                    totals
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var totals: some View {
+        VStack(alignment: .leading, spacing: compact ? 8 : 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(TokenFormatter.compact(store.todayTotalTokens))
                     .font(.system(size: compact ? 28 : 28, weight: .bold, design: .rounded))
@@ -48,13 +78,6 @@ struct TodayUsageSummary: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-
-        if let onTap {
-            Button(action: onTap) { content }
-                .buttonStyle(.plain)
-        } else {
-            content
-        }
     }
 
     private func providerShareRow(snapshot: ProviderSnapshot, today: DailyUsage) -> some View {

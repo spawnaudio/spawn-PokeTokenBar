@@ -17,6 +17,15 @@ struct PopoverMaterialBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
+/// Shared 0.5pt hairline so buttons, chips, tabs, and cards all read as bordered.
+enum TahoeHairline {
+    static let width: CGFloat = 0.5
+    static let idle = Color.primary.opacity(0.14)
+    static let selected = Color.primary.opacity(0.18)
+
+    static func tinted(_ color: Color) -> Color { color.opacity(0.45) }
+}
+
 /// Opaque card: 12pt continuous corners + hairline.
 @MainActor
 struct PopoverCardModifier: ViewModifier {
@@ -29,7 +38,7 @@ struct PopoverCardModifier: ViewModifier {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+                    .strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
             }
     }
 }
@@ -65,8 +74,8 @@ extension View {
             .background((tint?.opacity(0.16) ?? Color.primary.opacity(0.06)), in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
-                    tint?.opacity(0.40) ?? Color.primary.opacity(0.12),
-                    lineWidth: 0.5)
+                    tint.map(TahoeHairline.tinted) ?? TahoeHairline.idle,
+                    lineWidth: TahoeHairline.width)
             }
     }
 
@@ -79,8 +88,8 @@ extension View {
             .background(selected ? Color.primary.opacity(0.14) : Color.clear, in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
-                    selected ? Color.primary.opacity(0.12) : Color.clear,
-                    lineWidth: 0.5)
+                    selected ? TahoeHairline.selected : TahoeHairline.idle,
+                    lineWidth: TahoeHairline.width)
             }
     }
 
@@ -90,7 +99,7 @@ extension View {
             .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+                    .strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
             }
     }
 
@@ -105,12 +114,18 @@ extension View {
                 .padding(.vertical, 6)
                 .background(Color.primary.opacity(0.16), in: Capsule())
                 .overlay {
-                    Capsule().strokeBorder(Color.primary.opacity(0.14), lineWidth: 0.5)
+                    Capsule().strokeBorder(TahoeHairline.selected, lineWidth: TahoeHairline.width)
                 }
         case .regular:
             self.linearChipChrome()
         case .accessory:
-            self.buttonStyle(.plain)
+            self
+                .buttonStyle(.plain)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .overlay {
+                    Capsule().strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
+                }
         }
     }
 
@@ -119,14 +134,26 @@ extension View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
             .background(Color.primary.opacity(0.08), in: shape)
-            .overlay { shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5) }
+            .overlay { shape.strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width) }
     }
 
     func tahoePromptChrome(cornerRadius: CGFloat = 10) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return self
             .background(Color.primary.opacity(0.08), in: shape)
-            .overlay { shape.strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5) }
+            .overlay { shape.strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width) }
+    }
+
+    func tahoeIconChrome(selected: Bool = false) -> some View {
+        self
+            .background(
+                selected ? Color.primary.opacity(0.14) : Color.clear,
+                in: Circle())
+            .overlay {
+                Circle().strokeBorder(
+                    selected ? TahoeHairline.selected : TahoeHairline.idle,
+                    lineWidth: TahoeHairline.width)
+            }
     }
 }
 
@@ -199,14 +226,29 @@ struct TahoeTabItem<Value: Hashable> {
     }
 }
 
-/// Selected = filled quiet pill, idle = no fill.
+/// Selected = filled quiet pill, idle = no fill. Labels collapse to icons
+/// when the labeled cluster would wrap.
 @MainActor
 struct TahoeTabBar<Value: Hashable>: View {
     @Binding var selection: Value
     var size: ControlSize = .small
     let items: [TahoeTabItem<Value>]
 
+    private var canCollapseToIcons: Bool {
+        items.allSatisfy { $0.symbol != nil }
+    }
+
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            tabRow(showTitle: true)
+                .fixedSize(horizontal: true, vertical: false)
+            if canCollapseToIcons {
+                tabRow(showTitle: false)
+            }
+        }
+    }
+
+    private func tabRow(showTitle: Bool) -> some View {
         HStack(spacing: 4) {
             ForEach(items, id: \.value) { item in
                 let selected = selection == item.value
@@ -219,13 +261,18 @@ struct TahoeTabBar<Value: Hashable>: View {
                                 .foregroundStyle(
                                     item.symbolColor ?? (selected ? Color.primary : Color.secondary))
                         }
-                        Text(item.title)
+                        if showTitle {
+                            Text(item.title)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
                     }
                 }
                 .font(.system(size: 13, weight: selected ? .medium : .regular))
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
                 .linearSegmentChrome(selected: selected)
                 .controlSize(size)
+                .help(item.title)
                 .accessibilityLabel(item.title)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
@@ -233,20 +280,24 @@ struct TahoeTabBar<Value: Hashable>: View {
     }
 }
 
-/// 24–28pt metadata pill: quiet border.
+/// 24–28pt metadata pill: quiet border, optional team/status tint.
 @MainActor
 struct LinearTagChip: View {
     let text: String
+    var tint: Color? = nil
 
     var body: some View {
         Text(text)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(tint ?? Color.secondary)
             .lineLimit(1)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
+            .background((tint?.opacity(0.16) ?? Color.primary.opacity(0.06)), in: Capsule())
             .overlay {
-                Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 0.5)
+                Capsule().strokeBorder(
+                    tint.map(TahoeHairline.tinted) ?? TahoeHairline.idle,
+                    lineWidth: TahoeHairline.width)
             }
     }
 }
@@ -293,7 +344,11 @@ struct MutedProgressBar: View {
         let fraction = total > 0 ? min(max(value / total, 0), 1) : 0
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.08))
+                Capsule()
+                    .fill(Color.primary.opacity(0.08))
+                    .overlay {
+                        Capsule().strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
+                    }
                 Capsule()
                     .fill(Color.accentColor)
                     .frame(width: max(4, geo.size.width * fraction))
@@ -314,13 +369,18 @@ struct FocusPauseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label(paused ? resumeTitle : pauseTitle,
-                  systemImage: paused ? "play.fill" : "pause.fill")
+            ViewThatFits(in: .horizontal) {
+                Label(paused ? resumeTitle : pauseTitle,
+                      systemImage: paused ? "play.fill" : "pause.fill")
+                    .fixedSize(horizontal: true, vertical: false)
+                Image(systemName: paused ? "play.fill" : "pause.fill")
+            }
         }
         .tahoeButtonStyle(.prominent)
         .controlSize(.regular)
         .disabled(disabled)
         .help(paused ? resumeTitle : pauseTitle)
+        .accessibilityLabel(paused ? resumeTitle : pauseTitle)
     }
 }
 
@@ -359,43 +419,19 @@ struct PopoverShellToolbar: View {
                         .font(.body.weight(.medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
+                        .contentShape(Circle())
+                        .tahoeIconChrome()
                 }
                 .buttonStyle(.plain)
                 .help(l.goBack)
                 .accessibilityLabel(l.goBack)
             }
 
-            HStack(spacing: 4) {
-                ForEach(PopoverTab.allCases, id: \.self) { tab in
-                    let selected = !nav.showSettings && nav.tab == tab
-                    Button {
-                        nav.showSettings = false
-                        nav.tab = tab
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: tab.symbol)
-                            Text(tab.title(l))
-                        }
-                        .font(.system(size: 13, weight: selected ? .medium : .regular))
-                        .foregroundStyle(selected ? Color.primary : Color.secondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            selected ? Color.primary.opacity(0.12) : Color.clear,
-                            in: Capsule())
-                        .overlay {
-                            Capsule().strokeBorder(
-                                selected ? Color.primary.opacity(0.14) : Color.clear,
-                                lineWidth: 0.5)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(tab.title(l))
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                }
+            ViewThatFits(in: .horizontal) {
+                tabRow(showTitle: true)
+                    .fixedSize(horizontal: true, vertical: false)
+                tabRow(showTitle: false)
             }
-
             Spacer(minLength: 8)
 
             iconButton(
@@ -427,13 +463,47 @@ struct PopoverShellToolbar: View {
                 .font(.body)
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
                 .frame(width: 32, height: 32)
-                .background(
-                    selected ? Color.primary.opacity(0.14) : Color.clear,
-                    in: Circle()
-                )
+                .tahoeIconChrome(selected: selected)
         }
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(label)
+    }
+
+    private func tabRow(showTitle: Bool) -> some View {
+        HStack(spacing: 4) {
+            ForEach(PopoverTab.allCases, id: \.self) { tab in
+                let selected = !nav.showSettings && nav.tab == tab
+                Button {
+                    nav.showSettings = false
+                    nav.tab = tab
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: tab.symbol)
+                        if showTitle {
+                            Text(tab.title(l))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                    }
+                    .font(.system(size: 13, weight: selected ? .medium : .regular))
+                    .foregroundStyle(selected ? Color.primary : Color.secondary)
+                    .padding(.horizontal, showTitle ? 10 : 8)
+                    .padding(.vertical, 6)
+                    .background(
+                        selected ? Color.primary.opacity(0.12) : Color.clear,
+                        in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(
+                            selected ? TahoeHairline.selected : TahoeHairline.idle,
+                            lineWidth: TahoeHairline.width)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(tab.title(l))
+                .accessibilityLabel(tab.title(l))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
     }
 }

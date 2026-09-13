@@ -7,18 +7,24 @@ extension LaunchWindowPolicy {
 }
 
 /// Sticky menu-bar window. Default is the current 360pt compact size; attached
-/// stretch stops at 500pt, detached can go toward Today (720pt).
+/// stretch stops at 500pt. Detached uses normal window min/max (no 500pt cap).
 enum MenuBarPanelMetrics {
     static let defaultWidth: CGFloat = PopoverMetrics.width
     static let defaultHeight: CGFloat = 640
     static let minWidth: CGFloat = PopoverMetrics.width
     static let minHeight: CGFloat = 520
     static let attachedMaxWidth: CGFloat = 500
-    static let detachedMaxWidth: CGFloat = 720
+    static let attachedMaxHeight: CGFloat = 660
+    static let detachedMinHeight: CGFloat = 400
+    static let detachedMaxWidth: CGFloat = 2400
+    static let detachedMaxHeight: CGFloat = 2400
     static let maxWidth: CGFloat = detachedMaxWidth
-    static let maxHeight: CGFloat = 660
+    static let maxHeight: CGFloat = attachedMaxHeight
     static let statusItemGap: CGFloat = 6
     static let shellGap: CGFloat = 8
+    static let attachedCornerRadius: CGFloat = 12
+    /// Room for traffic lights on a unified hidden titlebar.
+    static let detachedTrafficLightInset: CGFloat = 76
     static let detachedKey = "menuBarPanelDetached"
 
     static var defaultContentSize: NSSize {
@@ -26,11 +32,24 @@ enum MenuBarPanelMetrics {
     }
 
     static var attachedStyleMask: NSWindow.StyleMask { [.borderless, .resizable] }
-    static var detachedStyleMask: NSWindow.StyleMask { [.titled, .closable, .miniaturizable, .resizable] }
+    static var detachedStyleMask: NSWindow.StyleMask {
+        [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+    }
 
     static func maxWidth(detached: Bool) -> CGFloat {
         detached ? detachedMaxWidth : attachedMaxWidth
     }
+
+    static func minHeight(detached: Bool) -> CGFloat {
+        detached ? detachedMinHeight : minHeight
+    }
+
+    static func maxHeight(detached: Bool) -> CGFloat {
+        detached ? detachedMaxHeight : attachedMaxHeight
+    }
+
+    static var shellFill: NSColor { .controlBackgroundColor }
+    static var canvasFill: NSColor { .underPageBackgroundColor }
 
     /// Dragging does not detach. Only the in-panel button does.
     static func shouldPlaceBelowStatusItem(detached: Bool) -> Bool { !detached }
@@ -44,23 +63,41 @@ enum MenuBarPanelMetrics {
         window.hidesOnDeactivate = false
         window.isReleasedWhenClosed = false
         window.collectionBehavior = [.moveToActiveSpace]
-        window.contentMinSize = NSSize(width: minWidth, height: minHeight)
-        window.contentMaxSize = NSSize(width: maxWidth(detached: detached), height: maxHeight)
+        window.contentMinSize = NSSize(width: minWidth, height: minHeight(detached: detached))
+        window.contentMaxSize = NSSize(
+            width: maxWidth(detached: detached),
+            height: maxHeight(detached: detached))
         window.setFrameAutosaveName(detached ? LaunchWindowPolicy.menuBarPanelAutosaveName : "")
-        window.isOpaque = true
-        window.backgroundColor = .underPageBackgroundColor
-        if let view = window.contentView {
-            view.wantsLayer = true
-            view.layer?.cornerRadius = detached ? 0 : 12
-            view.layer?.masksToBounds = !detached
+        window.titleVisibility = detached ? .hidden : .visible
+        window.titlebarAppearsTransparent = detached
+        window.titlebarSeparatorStyle = .none
+        window.toolbarStyle = .unifiedCompact
+        window.toolbar = nil
+        if detached {
+            window.isOpaque = true
+            window.backgroundColor = shellFill
+        } else {
+            window.isOpaque = false
+            window.backgroundColor = .clear
         }
+        applyAttachedClip(window.contentView, detached: detached)
+        window.invalidateShadow()
+    }
+
+    @MainActor
+    static func applyAttachedClip(_ view: NSView?, detached: Bool) {
+        guard let view else { return }
+        view.wantsLayer = true
+        view.layer?.cornerRadius = detached ? 0 : attachedCornerRadius
+        view.layer?.cornerCurve = .continuous
+        view.layer?.masksToBounds = !detached
+        view.layer?.backgroundColor = detached ? nil : NSColor.clear.cgColor
     }
 
     static func clampedContentSize(_ size: NSSize, detached: Bool = true) -> NSSize {
-        let maxW = maxWidth(detached: detached)
-        return NSSize(
-            width: min(max(size.width, minWidth), maxW),
-            height: min(max(size.height, minHeight), maxHeight))
+        NSSize(
+            width: min(max(size.width, minWidth), maxWidth(detached: detached)),
+            height: min(max(size.height, minHeight(detached: detached)), maxHeight(detached: detached)))
     }
 
     /// Place `size` under the status item, clamped to `visibleScreen`.
@@ -157,6 +194,16 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
         onVisibilityChange?()
     }
 
+    func windowDidResize(_ notification: Notification) {
+        MenuBarPanelMetrics.applyAttachedClip(window?.contentView, detached: usage.menuBarPanelDetached)
+        window?.invalidateShadow()
+    }
+
+    func windowDidEndLiveResize(_ notification: Notification) {
+        clampContentSize()
+        window?.invalidateShadow()
+    }
+
     private func presentExisting() {
         NSApp.activate(ignoringOtherApps: true)
         window?.deminiaturize(nil)
@@ -169,7 +216,7 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
     }
 
     private func hostedView() -> NSView {
-        NSHostingView(rootView:
+        let view = NSHostingView(rootView:
             PopoverView()
                 .environment(usage)
                 .environment(companion)
@@ -178,6 +225,8 @@ final class MenuBarPanelController: NSObject, NSWindowDelegate {
                 .environment(session)
                 .environment(\.locale, companion.language.displayLocale)
         )
+        MenuBarPanelMetrics.applyAttachedClip(view, detached: usage.menuBarPanelDetached)
+        return view
     }
 
     private func makeWindow() -> NSWindow {

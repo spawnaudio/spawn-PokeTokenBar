@@ -5,7 +5,7 @@ import SwiftUI
 private enum LinearChromeSymbol {
     static let issue = "circle"
     static let project = "hexagon"
-    static let initiative = "flag.fill"
+    static let initiative = "flag"
 }
 
 @MainActor
@@ -99,11 +99,7 @@ struct LinearIntegrationView: View {
             TahoeTabBar(selection: $selectedRoot, items: [
                 TahoeTabItem(.issues, title: l.linearIssuesTab, symbol: LinearChromeSymbol.issue),
                 TahoeTabItem(.projects, title: l.linearProjectsTab, symbol: LinearChromeSymbol.project),
-                TahoeTabItem(
-                    .initiatives,
-                    title: l.linearInitiativesTab,
-                    symbol: LinearChromeSymbol.initiative,
-                    symbolColor: LinearPriorityTint.gold),
+                TahoeTabItem(.initiatives, title: l.linearInitiativesTab, symbol: LinearChromeSymbol.initiative),
             ])
 
             if !store.linearIntegrationEnabled || !store.linearAPIKeyConfigured {
@@ -114,18 +110,18 @@ struct LinearIntegrationView: View {
             } else {
                 if selectedRoot == .issues {
                     TahoeTabBar(selection: $selectedIssuesTab, items: [
-                        TahoeTabItem(.inProgress, title: l.linearInProgressTab),
-                        TahoeTabItem(.completedToday, title: l.linearCompletedTodayTab),
+                        TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: "circle"),
+                        TahoeTabItem(.completedToday, title: l.linearCompletedTodayTab, symbol: "checkmark"),
                     ])
                 } else if selectedRoot == .projects {
                     TahoeTabBar(selection: $selectedProjectsTab, items: [
-                        TahoeTabItem(.inProgress, title: l.linearInProgressTab),
-                        TahoeTabItem(.production, title: l.linearProductionTab),
+                        TahoeTabItem(.inProgress, title: l.linearInProgressTab, symbol: LinearChromeSymbol.project),
+                        TahoeTabItem(.production, title: l.linearProductionTab, symbol: "cube"),
                     ])
                 } else if selectedRoot == .initiatives {
                     TahoeTabBar(selection: $selectedInitiativesTab, items: [
-                        TahoeTabItem(.active, title: l.linearActiveTab),
-                        TahoeTabItem(.planned, title: l.linearPlannedTab),
+                        TahoeTabItem(.active, title: l.linearActiveTab, symbol: LinearChromeSymbol.initiative),
+                        TahoeTabItem(.planned, title: l.linearPlannedTab, symbol: "calendar"),
                     ])
                 }
 
@@ -245,7 +241,7 @@ struct LinearIntegrationView: View {
     }
 }
 
-/// Unboxed two-line issue row. Click unfolds full metadata and markdown.
+/// Unboxed two-line issue row. The highlighted row toggles fold except dedicated controls.
 @MainActor
 private struct LinearIssueEntityRow: View {
     let issue: LinearIssueSummary
@@ -257,67 +253,78 @@ private struct LinearIssueEntityRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() }
-                } label: {
+                expandControl {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         LinearStatusDot(type: issue.stateType)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(issue.title)
-                                .font(.callout.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .lineLimit(expanded ? nil : 2)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            if !expanded {
-                                collapsedMeta
-                            }
-                        }
+                        Text(issue.title)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(expanded ? nil : 2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
                 LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
             }
 
             HStack(alignment: .center, spacing: 4) {
+                expandControl {
+                    Group {
+                        if !expanded {
+                            collapsedMeta
+                        } else {
+                            Color.clear.frame(height: 1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
                 LinearPriorityButton(issue: issue)
-                Spacer(minLength: 4)
                 LinearIssueStatusPicker(issue: issue)
                 LinearFocusButton(issue: issue, openDeskOnPin: false, onPinned: onPin)
                     .opacity(hovering || expanded ? 1 : 0.55)
             }
 
             if expanded {
-                LinearIssueMetadataList(issue: issue)
+                expandControl {
+                    LinearIssueMetadataList(issue: issue)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
                 if let text = issue.descriptionText, !text.isEmpty {
                     LinearMarkdownText(source: text)
                 }
                 LinearIssueCompletionStats(issue: issue)
-            } else if let text = issue.descriptionText, !text.isEmpty {
-                Text(text)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            Color.primary.opacity(hovering || expanded ? 0.06 : 0),
-            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(hovering || expanded ? 0.06 : 0))
+        )
         .onHover { hovering = $0 }
         .accessibilityAddTraits(expanded ? .isSelected : [])
     }
 
+    private func expandControl<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() }
+        } label: {
+            content()
+        }
+        .buttonStyle(.plain)
+    }
+
     @ViewBuilder
     private var collapsedMeta: some View {
-        let chips = metaChips
+        let chips = foldedChips
         if !chips.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    ForEach(Array(chips.enumerated()), id: \.offset) { _, text in
-                        LinearTagChip(text: text)
+                    ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                        LinearTagChip(text: chip.text, tint: chip.tint)
                     }
                 }
             }
@@ -325,17 +332,21 @@ private struct LinearIssueEntityRow: View {
         }
     }
 
-    private var metaChips: [String] {
-        var chips: [String] = []
-        if let key = issue.teamKey, !key.isEmpty { chips.append(key) }
-        if let project = issue.projectName, !project.isEmpty { chips.append(project) }
-        if let assignee = issue.assigneeName, !assignee.isEmpty { chips.append(assignee) }
-        if !issue.labelNames.isEmpty {
-            chips.append(contentsOf: issue.labelNames.prefix(3))
+    private var foldedChips: [(text: String, tint: Color?)] {
+        var chips: [(text: String, tint: Color?)] = []
+        if let key = issue.teamKey, !key.isEmpty {
+            chips.append((key, LinearTeamTint.color(forKey: key, name: issue.teamName)))
+        } else if let name = issue.teamName, !name.isEmpty {
+            chips.append((name, LinearTeamTint.color(forKey: nil, name: name)))
         }
-        if let estimate = issue.estimate { chips.append("E\(estimate)") }
+        if let project = issue.projectName, !project.isEmpty {
+            chips.append((project, nil))
+        }
+        for label in issue.labelNames.prefix(4) {
+            chips.append((label, nil))
+        }
         if let due = issue.dueDate {
-            chips.append(due.formatted(.dateTime.month(.abbreviated).day()))
+            chips.append((due.formatted(.dateTime.month(.abbreviated).day()), nil))
         }
         return chips
     }
@@ -352,9 +363,7 @@ private struct LinearContainerRow: Identifiable {
     var symbol: String
     var issues: [LinearIssueSummary]
 
-    var symbolTint: Color {
-        symbol == LinearChromeSymbol.initiative ? LinearPriorityTint.gold : .secondary
-    }
+    var symbolTint: Color { .secondary }
 
     init(project: LinearProjectSummary) {
         id = project.id

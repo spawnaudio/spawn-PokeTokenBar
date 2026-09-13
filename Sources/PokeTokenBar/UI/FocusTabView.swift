@@ -13,21 +13,57 @@ struct FocusTabView: View {
     private var l: L { companion.l }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            promptStack
-            CompanionHeader(store: companion)
-            if let current = session.session {
-                if current.issue.isPomodoro {
-                    pomodoroClock(current)
-                } else {
-                    pinnedIssue(current)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                promptStack
+                CompanionHeader(store: companion)
+                    .popoverCard()
+                pomodoroSection
+                linearSection
+                TodayUsageSummary(compact: true, showsRefresh: true) {
+                    nav.tab = .usage
                 }
-            } else {
-                idlePrompt
+                .popoverCard()
+                TimeXPView(store: store, companion: companion, compact: true)
+                    .popoverCard()
             }
-            TodayUsageSummary(compact: true) {
-                nav.tab = .usage
+        }
+    }
+
+    @ViewBuilder
+    private var pomodoroSection: some View {
+        if let current = session.session, current.issue.isPomodoro {
+            pomodoroClock(current)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                PopoverSectionLabel(text: l.pomodoroTitle)
+                ViewThatFits(in: .horizontal) {
+                    Button(l.pomoTimer) { session.openPomodoroSetup() }
+                        .tahoeButtonStyle(.prominent)
+                        .controlSize(.regular)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Button {
+                        session.openPomodoroSetup()
+                    } label: {
+                        Image(systemName: "timer")
+                    }
+                    .tahoeButtonStyle(.prominent)
+                    .controlSize(.regular)
+                    .help(l.pomoTimer)
+                    .accessibilityLabel(l.pomoTimer)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .popoverCard()
+        }
+    }
+
+    @ViewBuilder
+    private var linearSection: some View {
+        if let current = session.session, !current.issue.isPomodoro {
+            pinnedIssue(current)
+        } else {
+            idleLinearPrompt
         }
     }
 
@@ -91,6 +127,7 @@ struct FocusTabView: View {
                 .controlSize(.small)
             }
             LinearIssueStatusPicker(issue: issue, compact: false)
+            FocusTimerControls()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .popoverCard()
@@ -129,20 +166,36 @@ struct FocusTabView: View {
         .popoverCard()
     }
 
-    private var idlePrompt: some View {
+    private var idleLinearPrompt: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.focusIdlePrompt)
                 .font(.title3.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 8) {
-                Button(l.pomoTimer) { session.openPomodoroSetup() }
-                    .tahoeButtonStyle(.prominent)
-                Button(l.openLinearTab) { nav.tab = .linear }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    Button(l.openLinearTab) { nav.tab = .linear }
+                        .tahoeButtonStyle(.regular)
+                    Button(l.todayDeskMenuOpen) { session.openDesk() }
+                        .tahoeButtonStyle(.regular)
+                }
+                .controlSize(.regular)
+                .fixedSize(horizontal: true, vertical: false)
+                HStack(spacing: 8) {
+                    Button { nav.tab = .linear } label: {
+                        Image(systemName: "circle")
+                    }
                     .tahoeButtonStyle(.regular)
-                Button(l.todayDeskMenuOpen) { session.openDesk() }
+                    .help(l.openLinearTab)
+                    .accessibilityLabel(l.openLinearTab)
+                    Button { session.openDesk() } label: {
+                        Image(systemName: "calendar")
+                    }
                     .tahoeButtonStyle(.regular)
+                    .help(l.todayDeskMenuOpen)
+                    .accessibilityLabel(l.todayDeskMenuOpen)
+                }
+                .controlSize(.regular)
             }
-            .controlSize(.regular)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .popoverCard()

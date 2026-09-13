@@ -64,7 +64,11 @@ final class TahoeButtonStyleTests: XCTestCase {
         XCTAssertTrue(source.contains("struct LinearPropertyRow"))
         XCTAssertTrue(source.contains(".linearChipChrome(expands: expands, tint: tint)"))
         XCTAssertTrue(source.contains(".linearSegmentChrome(selected: selected)"))
+        XCTAssertTrue(source.contains("enum TahoeHairline"))
+        XCTAssertTrue(source.contains("func tahoeIconChrome"))
+        XCTAssertTrue(source.contains("TahoeHairline.idle"))
         XCTAssertTrue(source.contains("Color.primary.opacity(0.14)"))
+        XCTAssertTrue(source.contains("selected ? TahoeHairline.selected : TahoeHairline.idle"))
         XCTAssertTrue(source.contains("detachMenuBarPanel") || source.contains("menuBarPanelDetached"))
         XCTAssertFalse(
             source.contains("selected ? Color.accentColor"),
@@ -128,13 +132,16 @@ final class TahoeButtonStyleTests: XCTestCase {
             contentsOf: root.appendingPathComponent("LinearIssueComposer.swift"), encoding: .utf8)
         let usage = try String(
             contentsOf: root.appendingPathComponent("UsageTabView.swift"), encoding: .utf8)
+        let chrome = try String(
+            contentsOf: root.appendingPathComponent("PopoverChrome.swift"), encoding: .utf8)
 
         XCTAssertTrue(linear.contains("LinearIssueEntityRow"))
         XCTAssertTrue(linear.contains("LinearTagChip"))
         XCTAssertTrue(linear.contains("LinearMarkdownText"))
         XCTAssertTrue(linear.contains("LinearPriorityButton"))
-        XCTAssertTrue(linear.contains("flag.fill"))
-        XCTAssertTrue(linear.contains("LinearPriorityTint.gold"))
+        XCTAssertTrue(linear.contains("static let initiative = \"flag\""))
+        XCTAssertFalse(linear.contains("flag.fill"))
+        XCTAssertFalse(linear.contains("LinearPriorityTint.gold"))
         XCTAssertTrue(linear.contains("VStack(alignment: .leading, spacing: 0)"))
         XCTAssertFalse(linear.contains("popoverCard()"))
         XCTAssertFalse(linear.contains("hoveringHeader ? 0.08 : 0.04"))
@@ -150,6 +157,8 @@ final class TahoeButtonStyleTests: XCTestCase {
         XCTAssertTrue(controls.contains("struct LinearPriorityButton"))
         XCTAssertTrue(controls.contains("struct LinearMarkdownText"))
         XCTAssertTrue(controls.contains("tint: LinearWorkflowTint.color(for: issue.stateType)"))
+        XCTAssertTrue(controls.contains("enum LinearTeamTint"))
+        XCTAssertTrue(chrome.contains("ViewThatFits"))
 
         XCTAssertTrue(composer.contains("LinearPropertyRow(label: l.linearIssueTeam)"))
         XCTAssertTrue(composer.contains(".linearChipChrome(expands: true)"))

@@ -400,7 +400,7 @@ struct TodayDeskView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(Array(rows.enumerated()), id: \.offset) { _, field in
-                        inspectorRow(field)
+                        inspectorRow(field, issue: issue)
                     }
                     if let text = issue.descriptionText, !text.isEmpty {
                         LinearMarkdownText(source: text)
@@ -416,16 +416,22 @@ struct TodayDeskView: View {
         .popoverCard()
     }
 
-    private func inspectorRow(_ field: LinearIssueInspector.Field) -> some View {
+    private func inspectorRow(_ field: LinearIssueInspector.Field, issue: LinearIssueSummary) -> some View {
         LinearPropertyRow(label: inspectorLabel(field.kind)) {
             HStack(spacing: 6) {
                 if field.kind == .status {
                     LinearStatusDot(type: field.stateType)
                 }
-                Text(field.value)
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if field.kind == .team {
+                    LinearTagChip(
+                        text: field.value,
+                        tint: LinearTeamTint.color(forKey: issue.teamKey, name: issue.teamName))
+                } else {
+                    Text(field.value)
+                        .font(.callout)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

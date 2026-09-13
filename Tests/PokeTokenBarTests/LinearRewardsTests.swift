@@ -565,6 +565,65 @@ final class LinearRewardsTests: XCTestCase {
         XCTAssertTrue(String(LinearMarkdown.attributed("   ").characters).isEmpty)
     }
 
+    func testLinearMarkdownParsesHeadingsListsAndCheckboxes() {
+        let blocks = LinearMarkdown.blocks("""
+        # Title
+
+        hello **world**
+
+        - [ ] one
+        - [x] two
+        - three
+
+        > quoted
+        """)
+        XCTAssertEqual(blocks.count, 4)
+        guard case .heading(let level, let heading) = blocks[0] else {
+            return XCTFail("expected heading")
+        }
+        XCTAssertEqual(level, 1)
+        XCTAssertEqual(heading, "Title")
+        guard case .paragraph(let paragraph) = blocks[1] else {
+            return XCTFail("expected paragraph")
+        }
+        XCTAssertEqual(paragraph, "hello **world**")
+        guard case .list(let items, let ordered) = blocks[2] else {
+            return XCTFail("expected list")
+        }
+        XCTAssertFalse(ordered)
+        XCTAssertEqual(items.count, 3)
+        XCTAssertEqual(items[0].checked, false)
+        XCTAssertEqual(items[0].text, "one")
+        XCTAssertEqual(items[1].checked, true)
+        XCTAssertEqual(items[1].text, "two")
+        XCTAssertNil(items[2].checked)
+        XCTAssertEqual(items[2].text, "three")
+        guard case .quote(let quote) = blocks[3] else {
+            return XCTFail("expected quote")
+        }
+        XCTAssertEqual(quote, "quoted")
+    }
+
+    func testLinearMarkdownRewritesMentionsAndHtmlBreaks() {
+        let text = LinearMarkdown.preprocess("@[Ada](user:abc-123)<br>next")
+        XCTAssertTrue(text.contains("**@Ada**"))
+        XCTAssertTrue(text.contains("\nnext"))
+    }
+
+    func testLinearTeamTintMatchesWorkspaceKeysAndNames() {
+        XCTAssertEqual(LinearTeamTint.color(forKey: "SPA"), LinearTeamTint.spawnRed)
+        XCTAssertEqual(LinearTeamTint.color(forKey: "PER"), LinearTeamTint.squeakyAqua)
+        XCTAssertEqual(LinearTeamTint.color(forKey: "HOU"), LinearTeamTint.houseOrange)
+        XCTAssertEqual(LinearTeamTint.color(forKey: "STU"), LinearTeamTint.studyGreen)
+        XCTAssertEqual(
+            LinearTeamTint.color(forKey: nil, name: "[SPAWN] Audio"),
+            LinearTeamTint.spawnRed)
+        XCTAssertEqual(
+            LinearTeamTint.color(forKey: nil, name: "[SQUEAKY]"),
+            LinearTeamTint.squeakyAqua)
+        XCTAssertNil(LinearTeamTint.color(forKey: "ENG", name: "Engineering"))
+    }
+
     func testLinearPriorityChipLabels() {
         let l = L(.en)
         XCTAssertEqual(l.linearPriorityChip(nil), "Priority")
