@@ -1184,15 +1184,15 @@ final class UsageStore {
     }
 
     func linearIssue(id: String) -> LinearIssueSummary? {
-        if let issue = linearInProgressIssues.first(where: { $0.id == id }) { return issue }
-        if let issue = linearPlannedIssues.first(where: { $0.id == id }) { return issue }
-        if let issue = linearTodoIssues.first(where: { $0.id == id }) { return issue }
-        if let issue = linearCompletedTodayIssues.first(where: { $0.id == id }) { return issue }
+        if let issue = LinearClient.firstIssue(id: id, in: linearInProgressIssues) { return issue }
+        if let issue = LinearClient.firstIssue(id: id, in: linearPlannedIssues) { return issue }
+        if let issue = LinearClient.firstIssue(id: id, in: linearTodoIssues) { return issue }
+        if let issue = LinearClient.firstIssue(id: id, in: linearCompletedTodayIssues) { return issue }
         for project in linearProjects {
-            if let issue = project.issues.first(where: { $0.id == id }) { return issue }
+            if let issue = LinearClient.firstIssue(id: id, in: project.issues) { return issue }
         }
         for initiative in linearInitiatives {
-            if let issue = initiative.issues.first(where: { $0.id == id }) { return issue }
+            if let issue = LinearClient.firstIssue(id: id, in: initiative.issues) { return issue }
         }
         return nil
     }
@@ -1283,17 +1283,19 @@ final class UsageStore {
         var snapshot: LinearIssueSummary?
 
         func rewrite(_ issue: LinearIssueSummary) -> LinearIssueSummary {
-            guard issue.id == issueID else { return issue }
             var copy = issue
-            copy.stateId = update.stateId ?? copy.stateId
-            copy.stateName = update.stateName ?? copy.stateName
-            copy.stateType = update.stateType ?? copy.stateType
-            if (copy.stateType ?? "").lowercased() == "completed" {
-                copy.completedAt = update.completedAt ?? copy.completedAt ?? now
-            } else {
-                copy.completedAt = update.completedAt
+            if copy.id == issueID {
+                copy.stateId = update.stateId ?? copy.stateId
+                copy.stateName = update.stateName ?? copy.stateName
+                copy.stateType = update.stateType ?? copy.stateType
+                if (copy.stateType ?? "").lowercased() == "completed" {
+                    copy.completedAt = update.completedAt ?? copy.completedAt ?? now
+                } else {
+                    copy.completedAt = update.completedAt
+                }
+                snapshot = copy
             }
-            snapshot = copy
+            copy.children = copy.children.map(rewrite)
             return copy
         }
 
@@ -1331,7 +1333,9 @@ final class UsageStore {
             return copy
         }
 
-        if let bucket = LinearClient.openIssueBucket(stateType: type, stateName: issue.stateName) {
+        if let bucket = LinearClient.openIssueBucket(stateType: type, stateName: issue.stateName),
+           (issue.parentID ?? "").isEmpty
+        {
             switch bucket {
             case .inProgress:
                 linearInProgressIssues.append(issue)
@@ -1345,6 +1349,7 @@ final class UsageStore {
             }
         }
         if type == "completed",
+           (issue.parentID ?? "").isEmpty,
            let completedAt = issue.completedAt,
            Calendar.current.isDate(completedAt, inSameDayAs: now)
         {
@@ -1355,9 +1360,11 @@ final class UsageStore {
 
     private func applyOptimisticLinearPriorityChange(issueID: String, priority: Int) {
         func rewrite(_ issue: LinearIssueSummary) -> LinearIssueSummary {
-            guard issue.id == issueID else { return issue }
             var copy = issue
-            copy.priority = priority == 0 ? nil : priority
+            if copy.id == issueID {
+                copy.priority = priority == 0 ? nil : priority
+            }
+            copy.children = LinearClient.sortedByPriority(copy.children.map(rewrite))
             return copy
         }
         linearInProgressIssues = LinearClient.sortedByPriority(linearInProgressIssues.map(rewrite))

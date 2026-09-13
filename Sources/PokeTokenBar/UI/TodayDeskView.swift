@@ -207,8 +207,9 @@ struct TodayDeskView: View {
     }
 
     private var pinList: some View {
-        Group {
-            if store.linearInProgressIssues.isEmpty {
+        let roots = LinearClient.rootIssues(store.linearInProgressIssues)
+        return Group {
+            if roots.isEmpty {
                 Text(l.linearIssuesEmptyInProgress)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -216,11 +217,11 @@ struct TodayDeskView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(store.linearInProgressIssues) { issue in
+                        ForEach(roots) { issue in
                             TodayDeskPinRow(issue: issue, pinned: session.session?.issue.id == issue.id) {
                                 session.pin(issue, openDesk: true)
                             }
-                            if issue.id != store.linearInProgressIssues.last?.id {
+                            if issue.id != roots.last?.id {
                                 Divider().opacity(0.6)
                             }
                         }

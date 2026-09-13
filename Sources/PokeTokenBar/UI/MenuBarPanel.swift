@@ -66,8 +66,8 @@ enum MenuBarPanelMetrics {
         sidebarWidth: CGFloat = sidebarDefaultWidth
     ) -> CGFloat {
         guard detached else { return minWidth }
-        if sidebarCollapsed { return minWidth + collapsedStripWidth }
-        return minWidth + clampedSidebarWidth(sidebarWidth) + splitterWidth
+        if sidebarCollapsed { return minWidth + collapsedStripWidth + shellGap * 2 }
+        return minWidth + clampedSidebarWidth(sidebarWidth) + splitterWidth + shellGap * 2
     }
 
     /// Linear light: sidebar `#F3F4F6`, page white. Dark keeps a matching split.

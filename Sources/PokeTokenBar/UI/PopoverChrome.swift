@@ -64,6 +64,19 @@ extension View {
         modifier(PopoverCardModifier())
     }
 
+    /// Inset white content panel on the shell (attached popover and detached window).
+    func popoverInsetCanvas() -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return self
+            .padding(PopoverMetrics.padding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(shape.fill(Color(nsColor: MenuBarPanelMetrics.canvasFill)))
+            .clipShape(shape)
+            .overlay {
+                shape.strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
+            }
+    }
+
     /// Quiet bordered pill for menus/dropdowns.
     func linearChipChrome(expands: Bool = false, tint: Color? = nil) -> some View {
         self
@@ -414,25 +427,46 @@ struct PopoverChromeActionButtons: View {
     @Environment(UsageStore.self) private var store
 
     var spreadsAcrossBar: Bool = false
+    var vertical: Bool = false
 
     private var l: L { companion.l }
 
     var body: some View {
-        HStack(spacing: 8) {
-            iconButton(
-                systemName: store.menuBarPanelDetached ? "menubar.arrow.up.rectangle" : "macwindow.on.rectangle",
-                help: store.menuBarPanelDetached ? l.attachMenuBarPanel : l.detachMenuBarPanel,
-                label: store.menuBarPanelDetached ? l.attachMenuBarPanel : l.detachMenuBarPanel,
-                selected: store.menuBarPanelDetached
-            ) {
-                store.menuBarPanelDetached.toggle()
+        let detach = iconButton(
+            systemName: store.menuBarPanelDetached ? "menubar.arrow.up.rectangle" : "macwindow.on.rectangle",
+            help: store.menuBarPanelDetached ? l.attachMenuBarPanel : l.detachMenuBarPanel,
+            label: store.menuBarPanelDetached ? l.attachMenuBarPanel : l.detachMenuBarPanel,
+            selected: store.menuBarPanelDetached
+        ) {
+            store.menuBarPanelDetached.toggle()
+        }
+        let today = iconButton(
+            systemName: "calendar",
+            help: l.todayDeskMenuOpen,
+            label: l.todayDeskWindowTitle
+        ) {
+            session.openDesk()
+        }
+        let settings = iconButton(
+            systemName: "gearshape",
+            help: l.settings,
+            label: l.settings,
+            selected: nav.showSettings
+        ) {
+            nav.showSettings.toggle()
+        }
+        if vertical {
+            VStack(spacing: 8) {
+                detach
+                today
+                settings
             }
-            iconButton(systemName: "calendar", help: l.todayDeskMenuOpen, label: l.todayDeskWindowTitle) {
-                session.openDesk()
-            }
-            if spreadsAcrossBar { Spacer(minLength: 8) }
-            iconButton(systemName: "gearshape", help: l.settings, label: l.settings, selected: nav.showSettings) {
-                nav.showSettings.toggle()
+        } else {
+            HStack(spacing: 8) {
+                detach
+                today
+                if spreadsAcrossBar { Spacer(minLength: 8) }
+                settings
             }
         }
     }

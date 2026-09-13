@@ -256,16 +256,7 @@ struct PopoverView: View {
                 .padding(.top, 6)
                 .padding(.bottom, 4)
             canvasStack
-                .padding(panelPad)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .background {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(nsColor: MenuBarPanelMetrics.canvasFill))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(TahoeHairline.idle, lineWidth: TahoeHairline.width)
-                }
+                .popoverInsetCanvas()
                 .padding(.leading, gap)
                 .padding(.trailing, gap)
                 .padding(.bottom, gap)
@@ -274,41 +265,33 @@ struct PopoverView: View {
     }
 
     private func detachedLayout(size: CGSize) -> some View {
+        let gap = MenuBarPanelMetrics.shellGap
         let panelPad = PopoverMetrics.padding
         let collapsed = store.menuBarSidebarCollapsed
         let sidebarWidth = collapsed
             ? MenuBarPanelMetrics.collapsedStripWidth
             : MenuBarPanelMetrics.clampedSidebarWidth(CGFloat(store.menuBarSidebarWidth))
         let splitter = collapsed ? 0 : MenuBarPanelMetrics.splitterWidth
-        let contentWidth = max(0, size.width - sidebarWidth - splitter - panelPad * 2)
-        return VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                sidebarColumn(width: sidebarWidth, collapsed: collapsed)
-                if !collapsed {
-                    ChromeColumnSplitter(
-                        collapsed: false,
-                        displayedWidth: sidebarWidth,
-                        growsWhenDraggedPositive: true,
-                        collapseLabel: l.collapseMenuBarSidebar,
-                        expandLabel: l.expandMenuBarSidebar,
-                        onToggle: { store.menuBarSidebarCollapsed = true },
-                        onDragTo: { store.menuBarSidebarWidth = Double(MenuBarPanelMetrics.clampedSidebarWidth($0)) }
-                    )
-                }
-                canvasStack
-                    .padding(panelPad)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .background(Color(nsColor: MenuBarPanelMetrics.canvasFill))
+        let contentWidth = max(0, size.width - sidebarWidth - splitter - gap * 2 - panelPad * 2)
+        return HStack(spacing: 0) {
+            sidebarColumn(width: sidebarWidth, collapsed: collapsed)
+            if !collapsed {
+                ChromeColumnSplitter(
+                    collapsed: false,
+                    displayedWidth: sidebarWidth,
+                    growsWhenDraggedPositive: true,
+                    collapseLabel: l.collapseMenuBarSidebar,
+                    expandLabel: l.expandMenuBarSidebar,
+                    onToggle: { store.menuBarSidebarCollapsed = true },
+                    onDragTo: { store.menuBarSidebarWidth = Double(MenuBarPanelMetrics.clampedSidebarWidth($0)) }
+                )
             }
-            PopoverChromeActionButtons(spreadsAcrossBar: true)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(nsColor: MenuBarPanelMetrics.shellFill))
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(TahoeHairline.idle)
-                        .frame(height: TahoeHairline.width)
-                }
+            canvasStack
+                .popoverInsetCanvas()
+                .padding(.top, MenuBarPanelMetrics.sidebarTrafficLightClearance)
+                .padding(.leading, gap)
+                .padding(.trailing, gap)
+                .padding(.bottom, gap)
         }
         .environment(\.popoverContentWidth, contentWidth)
     }
@@ -334,6 +317,8 @@ struct PopoverView: View {
                 MenuBarSidebarNav()
             }
             Spacer(minLength: 0)
+            PopoverChromeActionButtons(vertical: collapsed)
+                .frame(maxWidth: .infinity, alignment: collapsed ? .center : .leading)
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 8)

@@ -60,6 +60,8 @@ struct LinearIssueSummary: Equatable, Sendable, Identifiable {
     var dueDate: Date?
     var completedAt: Date?
     var descriptionText: String?
+    var parentID: String? = nil
+    var children: [LinearIssueSummary] = []
 }
 
 /// Fields the Today inspector (and tests) show from an already-fetched issue. Empty values are omitted.
@@ -388,13 +390,6 @@ struct LinearClient: Sendable {
         return data
     }
 
-    static let issueNodeFields = """
-    id identifier title url description priority estimate \
-    state { id name type } assignee { name email } project { name } \
-    team { id name key states { nodes { id name type position } } } \
-    labels { nodes { name } } createdAt updatedAt dueDate completedAt
-    """
-
     /// Nested project issues omit `team.states` (default page 50) so container queries
     /// stay under Linear's per-request complexity cap. Workflow states are copied from
     /// the issues query via `hydrateTeamStates`, or fetched once per missing team.
@@ -403,6 +398,17 @@ struct LinearClient: Sendable {
     state { id name type } assignee { name email } project { name } \
     team { id name key } createdAt updatedAt dueDate completedAt
     """
+
+    static var issueNodeFields: String {
+        """
+        id identifier title url description priority estimate \
+        state { id name type } assignee { name email } project { name } \
+        team { id name key states { nodes { id name type position } } } \
+        labels { nodes { name } } createdAt updatedAt dueDate completedAt \
+        parent { id } \
+        children(first: 12) { nodes { \(lightIssueNodeFields) } }
+        """
+    }
 
     /// One lookup for nested issues whose team never appeared on the issues query.
     private static var teamStatesQuery: String {
@@ -640,8 +646,8 @@ struct LinearClient: Sendable {
               let inProgressNodes = inProgressPayload["nodes"] as? [[String: Any]]
         else { throw LinearAPIError.decoding }
 
-        let completed = try completedNodes.map(parseIssueSummary)
-        let open = try inProgressNodes.map(parseIssueSummary)
+        let completed = attachSubIssues(try completedNodes.map(parseIssueSummary))
+        let open = attachSubIssues(try inProgressNodes.map(parseIssueSummary))
         let partitioned = partitionOpenIssues(open)
         let projects = parseProjects(dataObj["projects"])
         let initiatives = parseInitiatives(dataObj["initiatives"])
@@ -660,9 +666,56 @@ struct LinearClient: Sendable {
         let name = (stateName ?? "").lowercased()
         if type == "completed" || type == "canceled" { return nil }
         if type == "started" { return .inProgress }
-        if name.contains("todo") { return .todo }
-        if name.contains("planned") || type == "backlog" || type == "triage" { return .planned }
-        if type == "unstarted" { return .todo }
+        if name == "planned" || type == "planned" { return .planned }
+        if name.contains("todo") || type == "unstarted" { return .todo }
+        return nil
+    }
+
+    static func rootIssues(_ issues: [LinearIssueSummary]) -> [LinearIssueSummary] {
+        let ids = Set(issues.map(\.id))
+        return issues.filter { issue in
+            guard let parentID = issue.parentID, !parentID.isEmpty else { return true }
+            return !ids.contains(parentID)
+        }
+    }
+
+    /// Fold GraphQL `children` and sibling `parent { id }` rows into one tree.
+    static func attachSubIssues(_ issues: [LinearIssueSummary]) -> [LinearIssueSummary] {
+        var byID: [String: LinearIssueSummary] = [:]
+        for issue in issues {
+            byID[issue.id] = issue
+        }
+        for issue in issues {
+            for child in issue.children where byID[child.id] == nil {
+                var copy = child
+                if (copy.parentID ?? "").isEmpty {
+                    copy.parentID = issue.id
+                }
+                byID[copy.id] = copy
+            }
+        }
+
+        var grouped: [String: [LinearIssueSummary]] = [:]
+        for issue in byID.values {
+            guard let parentID = issue.parentID, !parentID.isEmpty, byID[parentID] != nil else { continue }
+            grouped[parentID, default: []].append(issue)
+        }
+
+        func withChildren(_ issue: LinearIssueSummary) -> LinearIssueSummary {
+            var copy = issue
+            let nested = grouped[issue.id] ?? []
+            copy.children = sortedByPriority(nested.map(withChildren))
+            return copy
+        }
+
+        return sortedByPriority(rootIssues(Array(byID.values)).map(withChildren))
+    }
+
+    static func firstIssue(id: String, in issues: [LinearIssueSummary]) -> LinearIssueSummary? {
+        for issue in issues {
+            if issue.id == id { return issue }
+            if let nested = firstIssue(id: id, in: issue.children) { return nested }
+        }
         return nil
     }
 
@@ -674,7 +727,7 @@ struct LinearClient: Sendable {
         var inProgress: [LinearIssueSummary] = []
         var planned: [LinearIssueSummary] = []
         var todo: [LinearIssueSummary] = []
-        for issue in issues {
+        for issue in rootIssues(issues) {
             switch openIssueBucket(stateType: issue.stateType, stateName: issue.stateName) {
             case .inProgress: inProgress.append(issue)
             case .planned: planned.append(issue)
@@ -779,8 +832,10 @@ struct LinearClient: Sendable {
         var byTeam: [String: [LinearWorkflowState]] = [:]
         func ingest(_ issues: [LinearIssueSummary]) {
             for issue in issues {
-                guard let teamID = issue.teamID, !issue.teamStates.isEmpty else { continue }
-                byTeam[teamID] = issue.teamStates
+                if let teamID = issue.teamID, !issue.teamStates.isEmpty {
+                    byTeam[teamID] = issue.teamStates
+                }
+                ingest(issue.children)
             }
         }
         ingest(dashboard.completedRecent)
@@ -797,10 +852,12 @@ struct LinearClient: Sendable {
         var ids: [String] = []
         func walk(_ issues: [LinearIssueSummary]) {
             for issue in issues {
-                guard let teamID = issue.teamID, issue.teamStates.isEmpty,
-                      seen.insert(teamID).inserted
-                else { continue }
-                ids.append(teamID)
+                if let teamID = issue.teamID, issue.teamStates.isEmpty,
+                   seen.insert(teamID).inserted
+                {
+                    ids.append(teamID)
+                }
+                walk(issue.children)
             }
         }
         walk(dashboard.completedRecent)
@@ -831,6 +888,7 @@ struct LinearClient: Sendable {
                 if copy.completedStateId == nil {
                     copy.completedStateId = completedStateID(from: copy.teamStates)
                 }
+                copy.children = fill(issue.children)
                 return copy
             }
         }
@@ -1099,7 +1157,21 @@ struct LinearClient: Sendable {
             updatedAt: parseDate(node["updatedAt"]),
             dueDate: parseDate(node["dueDate"]),
             completedAt: parseDate(node["completedAt"]),
-            descriptionText: node["description"] as? String)
+            descriptionText: node["description"] as? String,
+            parentID: (node["parent"] as? [String: Any])?["id"] as? String,
+            children: nestedChildren(from: node, parentID: id))
+    }
+
+    private static func nestedChildren(from node: [String: Any], parentID: String) -> [LinearIssueSummary] {
+        let nodes = ((node["children"] as? [String: Any])?["nodes"] as? [[String: Any]]) ?? []
+        let children = nodes.compactMap { child -> LinearIssueSummary? in
+            guard var parsed = try? parseIssueSummary(child) else { return nil }
+            if (parsed.parentID ?? "").isEmpty {
+                parsed.parentID = parentID
+            }
+            return parsed
+        }
+        return sortedByPriority(children)
     }
 
     private static func prioritySortValue(_ priority: Int?) -> Int {

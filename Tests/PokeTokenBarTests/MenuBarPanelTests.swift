@@ -145,16 +145,19 @@ final class MenuBarPanelTests: XCTestCase {
         let chrome = try String(
             contentsOf: root.appendingPathComponent("PopoverChrome.swift"), encoding: .utf8)
         XCTAssertTrue(popover.contains("PopoverShellToolbar"))
-        XCTAssertTrue(popover.contains("canvasFill"))
+        XCTAssertTrue(popover.contains("popoverInsetCanvas"))
         XCTAssertTrue(popover.contains("shellFill"))
         XCTAssertTrue(popover.contains("attachedCornerRadius"))
         XCTAssertTrue(popover.contains("shellGap"))
+        XCTAssertTrue(chrome.contains("func popoverInsetCanvas"))
+        XCTAssertTrue(chrome.contains("canvasFill"))
         XCTAssertTrue(chrome.contains("struct PopoverChromeActionButtons"))
         XCTAssertTrue(chrome.contains("struct MenuBarSidebarNav"))
         XCTAssertTrue(chrome.contains("struct ChromeColumnSplitter"))
         XCTAssertTrue(popover.contains("menuBarSidebarLayout"))
-        XCTAssertTrue(popover.contains("PopoverChromeActionButtons(spreadsAcrossBar: true)"))
+        XCTAssertTrue(popover.contains("PopoverChromeActionButtons(vertical: collapsed)"))
         XCTAssertTrue(popover.contains("MenuBarSidebarNav"))
+        XCTAssertTrue(chrome.contains("var vertical: Bool"))
     }
 
     func testFocusTabKeepsUsageAndTimeXPSeparate() throws {

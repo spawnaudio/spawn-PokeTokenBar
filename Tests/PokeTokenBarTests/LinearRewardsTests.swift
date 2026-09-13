@@ -209,18 +209,72 @@ final class LinearRewardsTests: XCTestCase {
         let dashboard = try LinearClient.parseIssueDashboard(json)
         XCTAssertEqual(dashboard.inProgress.map(\.id), ["issue-start"])
         XCTAssertEqual(dashboard.todo.map(\.id), ["issue-todo"])
-        XCTAssertEqual(dashboard.planned.map(\.id), ["issue-planned", "issue-backlog", "issue-triage"])
+        XCTAssertEqual(dashboard.planned.map(\.id), ["issue-planned"])
         XCTAssertTrue(dashboard.completedRecent.isEmpty)
     }
 
     func testOpenIssueBucketMapsWorkflowTypes() {
         XCTAssertEqual(LinearClient.openIssueBucket(stateType: "started", stateName: "In Progress"), .inProgress)
         XCTAssertEqual(LinearClient.openIssueBucket(stateType: "unstarted", stateName: "Todo"), .todo)
-        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "backlog", stateName: "Backlog"), .planned)
-        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "triage", stateName: "Triage"), .planned)
+        XCTAssertNil(LinearClient.openIssueBucket(stateType: "backlog", stateName: "Backlog"))
+        XCTAssertNil(LinearClient.openIssueBucket(stateType: "triage", stateName: "Triage"))
         XCTAssertEqual(LinearClient.openIssueBucket(stateType: "unstarted", stateName: "Planned"), .planned)
+        XCTAssertEqual(LinearClient.openIssueBucket(stateType: "planned", stateName: "Planned"), .planned)
         XCTAssertNil(LinearClient.openIssueBucket(stateType: "completed", stateName: "Done"))
         XCTAssertNil(LinearClient.openIssueBucket(stateType: "canceled", stateName: "Canceled"))
+    }
+
+    func testParseIssueDashboardNestsSubIssuesOnTheParent() throws {
+        let json = """
+        {"data":{
+          "completedRecent":{"nodes":[]},
+          "inProgress":{"nodes":[
+            {"id":"parent-1","identifier":"ENG-1","title":"Parent",
+             "state":{"name":"In Progress","type":"started"},
+             "children":{"nodes":[
+               {"id":"child-1","identifier":"ENG-2","title":"Child",
+                "state":{"name":"Todo","type":"unstarted"}},
+               {"id":"child-2","identifier":"ENG-3","title":"Also child",
+                "priority":1,"state":{"name":"In Progress","type":"started"}}
+             ]}},
+            {"id":"child-1","identifier":"ENG-2","title":"Child",
+             "parent":{"id":"parent-1"},
+             "state":{"name":"Todo","type":"unstarted"}}
+          ]}
+        }}
+        """.data(using: .utf8)!
+
+        let dashboard = try LinearClient.parseIssueDashboard(json)
+        XCTAssertEqual(dashboard.inProgress.map(\.id), ["parent-1"])
+        XCTAssertTrue(dashboard.todo.isEmpty)
+        let parent = try XCTUnwrap(dashboard.inProgress.first)
+        XCTAssertEqual(parent.children.map(\.id), ["child-2", "child-1"])
+        XCTAssertEqual(parent.children.first?.title, "Also child")
+        XCTAssertEqual(parent.children.last?.parentID, "parent-1")
+    }
+
+    func testParseIssueDashboardNestsSiblingsUsingParentID() throws {
+        let json = """
+        {"data":{
+          "completedRecent":{"nodes":[]},
+          "inProgress":{"nodes":[
+            {"id":"parent-1","identifier":"ENG-1","title":"Parent",
+             "state":{"name":"In Progress","type":"started"}},
+            {"id":"child-1","identifier":"ENG-2","title":"Child",
+             "parent":{"id":"parent-1"},
+             "state":{"name":"Todo","type":"unstarted"}},
+            {"id":"orphan","identifier":"ENG-3","title":"Orphan child",
+             "parent":{"id":"missing-parent"},
+             "state":{"name":"Todo","type":"unstarted"}}
+          ]}
+        }}
+        """.data(using: .utf8)!
+
+        let dashboard = try LinearClient.parseIssueDashboard(json)
+        XCTAssertEqual(dashboard.inProgress.map(\.id), ["parent-1"])
+        XCTAssertEqual(dashboard.todo.map(\.id), ["orphan"])
+        XCTAssertEqual(dashboard.inProgress.first?.children.map(\.id), ["child-1"])
+        XCTAssertEqual(dashboard.inProgress.first?.children.first?.parentID, "parent-1")
     }
 
     func testParseIssueDashboardKeepsInProgressProjectsAndInitiatives() throws {
@@ -508,6 +562,8 @@ final class LinearRewardsTests: XCTestCase {
         XCTAssertTrue(issuesQuery.contains("states { nodes { id name type position } }"))
         XCTAssertTrue(issuesQuery.contains("state { id name type }"))
         XCTAssertTrue(issuesQuery.contains("filter: { state: { type: { in: [\"triage\", \"backlog\", \"unstarted\", \"started\"] } } }"))
+        XCTAssertTrue(issuesQuery.contains("parent { id }"))
+        XCTAssertTrue(issuesQuery.contains("children(first: 12)"))
         XCTAssertFalse(issuesQuery.contains("projects("))
         XCTAssertTrue(containersQuery.contains("projects"))
         XCTAssertTrue(containersQuery.contains("initiatives"))

@@ -11,12 +11,14 @@ struct LinearIntegrationView: View {
     private var l: L { companion.l }
 
     private var visibleIssues: [LinearIssueSummary] {
+        let listed: [LinearIssueSummary]
         switch nav.linearIssuesTab {
-        case .completedToday: return store.linearCompletedTodayIssues
-        case .inProgress: return store.linearInProgressIssues
-        case .planned: return store.linearPlannedIssues
-        case .todo: return store.linearTodoIssues
+        case .completedToday: listed = store.linearCompletedTodayIssues
+        case .inProgress: listed = store.linearInProgressIssues
+        case .planned: listed = store.linearPlannedIssues
+        case .todo: listed = store.linearTodoIssues
         }
+        return LinearClient.rootIssues(listed)
     }
 
     private var visibleProjects: [LinearProjectSummary] {
@@ -229,6 +231,7 @@ struct LinearIntegrationView: View {
 private struct LinearIssueEntityRow: View {
     let issue: LinearIssueSummary
     let onPin: () -> Void
+    var nested: Bool = false
 
     @State private var hovering = false
     @State private var expanded = false
@@ -278,6 +281,18 @@ private struct LinearIssueEntityRow: View {
                 }
                 LinearIssueCompletionStats(issue: issue)
                     .allowsHitTesting(false)
+                if !issue.children.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(issue.children) { child in
+                            LinearIssueEntityRow(issue: child, onPin: onPin, nested: true)
+                            if child.id != issue.children.last?.id {
+                                Divider().opacity(0.5)
+                            }
+                        }
+                    }
+                    .padding(.leading, nested ? 8 : 14)
+                    .zIndex(1)
+                }
             }
         }
         .padding(.vertical, 8)
