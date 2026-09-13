@@ -165,6 +165,32 @@ final class TahoeButtonStyleTests: XCTestCase {
 
         XCTAssertTrue(usage.contains("linearSegmentChrome(selected: isSelected)"))
         XCTAssertFalse(usage.contains("TahoeGlassCluster"))
+
+        let issueRow = structSource(linear, named: "LinearIssueEntityRow", until: "LinearContainerRow")
+        XCTAssertTrue(issueRow.contains("foldedTeamLine"))
+        XCTAssertTrue(issueRow.contains("foldedProjectLine"))
+        XCTAssertTrue(issueRow.contains("foldedLabelsLine"))
+        XCTAssertTrue(issueRow.contains(".background {"))
+        XCTAssertTrue(issueRow.contains(".contentShape("))
+        XCTAssertTrue(issueRow.contains("allowsHitTesting(false)"))
+        XCTAssertTrue(issueRow.contains("LinearIssueIDButton"))
+        XCTAssertTrue(issueRow.contains("LinearPriorityButton"))
+        XCTAssertTrue(issueRow.contains("LinearIssueStatusPicker"))
+        XCTAssertTrue(issueRow.contains("LinearFocusButton"))
+        XCTAssertTrue(issueRow.contains("LinearMarkdownText"))
+        XCTAssertFalse(issueRow.contains("expandControl"))
+        XCTAssertFalse(issueRow.contains("foldedChips"))
+        XCTAssertFalse(issueRow.contains("Color.clear.frame(height: 1)"))
+        XCTAssertFalse(
+            issueRow.contains("ScrollView(.horizontal"),
+            "folded project and labels must not share a horizontal chip strip with team")
+    }
+
+    private func structSource(_ source: String, named name: String, until nextName: String) -> String {
+        guard let start = source.range(of: "struct \(name)") else { return "" }
+        let rest = source[start.lowerBound...]
+        guard let end = rest.range(of: "struct \(nextName)") else { return String(rest) }
+        return String(rest[..<end.lowerBound])
     }
 
     private func popupMenuContainsTahoeButtonStyle(_ source: String) -> Bool {

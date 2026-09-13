@@ -17,7 +17,6 @@ struct FocusTabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 promptStack
                 CompanionHeader(store: companion)
-                    .popoverCard()
                 pomodoroSection
                 linearSection
                 TodayUsageSummary(compact: true, showsRefresh: true) {

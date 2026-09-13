@@ -164,5 +164,13 @@ final class MenuBarPanelTests: XCTestCase {
         XCTAssertTrue(focus.contains("l.pomoTimer"))
         XCTAssertTrue(focus.contains("CompanionHeader(store: companion)"))
         XCTAssertTrue(focus.contains(".popoverCard()"))
+        let companionRange = try XCTUnwrap(focus.range(of: "CompanionHeader(store: companion)"))
+        let nextToken = focus[companionRange.upperBound...]
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty } ?? ""
+        XCTAssertFalse(
+            nextToken.hasPrefix(".popoverCard("),
+            "CompanionHeader is a canvas hero, not a hairline content card")
     }
 }

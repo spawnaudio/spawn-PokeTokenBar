@@ -241,7 +241,7 @@ struct LinearIntegrationView: View {
     }
 }
 
-/// Unboxed two-line issue row. The highlighted row toggles fold except dedicated controls.
+/// Unboxed issue row. The highlighted row toggles fold; dedicated controls stay dedicated.
 @MainActor
 private struct LinearIssueEntityRow: View {
     let issue: LinearIssueSummary
@@ -250,105 +250,119 @@ private struct LinearIssueEntityRow: View {
     @State private var hovering = false
     @State private var expanded = false
 
+    private var rowShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                expandControl {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        LinearStatusDot(type: issue.stateType)
-                        Text(issue.title)
-                            .font(.callout.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .lineLimit(expanded ? nil : 2)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    LinearStatusDot(type: issue.stateType)
+                    Text(issue.title)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(expanded ? nil : 2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .allowsHitTesting(false)
+
                 LinearIssueIDButton(identifier: issue.identifier, url: issue.issueURL)
             }
 
             HStack(alignment: .center, spacing: 4) {
-                expandControl {
-                    Group {
-                        if !expanded {
-                            collapsedMeta
-                        } else {
-                            Color.clear.frame(height: 1)
-                        }
-                    }
+                foldedTeamLine
                     .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
+                    .allowsHitTesting(false)
                 LinearPriorityButton(issue: issue)
                 LinearIssueStatusPicker(issue: issue)
                 LinearFocusButton(issue: issue, openDeskOnPin: false, onPinned: onPin)
                     .opacity(hovering || expanded ? 1 : 0.55)
             }
 
+            if !expanded {
+                foldedProjectLine
+                foldedLabelsLine
+            }
+
             if expanded {
-                expandControl {
-                    LinearIssueMetadataList(issue: issue)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
+                LinearIssueMetadataList(issue: issue)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .allowsHitTesting(false)
                 if let text = issue.descriptionText, !text.isEmpty {
                     LinearMarkdownText(source: text)
                 }
                 LinearIssueCompletionStats(issue: issue)
+                    .allowsHitTesting(false)
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(hovering || expanded ? 0.06 : 0))
-        )
+        .background {
+            Button {
+                withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() }
+            } label: {
+                rowShape
+                    .fill(Color.primary.opacity(hovering || expanded ? 0.06 : 0))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(rowShape)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(issue.title)
+            .accessibilityAddTraits(expanded ? .isSelected : [])
+        }
+        .contentShape(rowShape)
         .onHover { hovering = $0 }
         .accessibilityAddTraits(expanded ? .isSelected : [])
     }
 
-    private func expandControl<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.12)) { expanded.toggle() }
-        } label: {
-            content()
+    @ViewBuilder
+    private var foldedTeamLine: some View {
+        let chips = foldedTeamChips
+        if !expanded, !chips.isEmpty {
+            chipRow(chips)
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private var collapsedMeta: some View {
-        let chips = foldedChips
-        if !chips.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
-                        LinearTagChip(text: chip.text, tint: chip.tint)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private var foldedProjectLine: some View {
+        if let project = issue.projectName, !project.isEmpty {
+            LinearTagChip(text: project, tint: nil)
+                .allowsHitTesting(false)
         }
     }
 
-    private var foldedChips: [(text: String, tint: Color?)] {
+    @ViewBuilder
+    private var foldedLabelsLine: some View {
+        let labels = Array(issue.labelNames.prefix(4))
+        if !labels.isEmpty {
+            chipRow(labels.map { (text: $0, tint: nil as Color?) })
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var foldedTeamChips: [(text: String, tint: Color?)] {
         var chips: [(text: String, tint: Color?)] = []
         if let key = issue.teamKey, !key.isEmpty {
             chips.append((key, LinearTeamTint.color(forKey: key, name: issue.teamName)))
         } else if let name = issue.teamName, !name.isEmpty {
             chips.append((name, LinearTeamTint.color(forKey: nil, name: name)))
         }
-        if let project = issue.projectName, !project.isEmpty {
-            chips.append((project, nil))
-        }
-        for label in issue.labelNames.prefix(4) {
-            chips.append((label, nil))
-        }
         if let due = issue.dueDate {
             chips.append((due.formatted(.dateTime.month(.abbreviated).day()), nil))
         }
         return chips
+    }
+
+    @ViewBuilder
+    private func chipRow(_ chips: [(text: String, tint: Color?)]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                LinearTagChip(text: chip.text, tint: chip.tint)
+            }
+        }
     }
 }
 
